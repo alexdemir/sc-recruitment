@@ -35,7 +35,14 @@ else
     S = load(tuneFile);  T = S.T;
 end
 fprintf('pure pursuit : Ld0 = %.1f m, kv = %.2f s   (J = %.3f s)\n', T.pp.best.Ld0, T.pp.best.kv, T.pp.best.J);
-fprintf('stanley      : ke = %.1f 1/s, kSoft = %.1f m/s (J = %.3f s)\n', T.st.best.ke, T.st.best.kSoft, T.st.best.J);
+fprintf('stanley      : ke = %.1f 1/s, kSoft = %.2f m/s (J = %.3f s)\n', T.st.best.ke, T.st.best.kSoft, T.st.best.J);
+
+Rt = tuning_robustness(T);
+fprintf('\ngain-space usability (fraction of the swept grid within x%% of that law''s best)\n');
+fprintf('  pure pursuit : %5.1f %% within 1 %%, %5.1f %% within 5 %%  (%d pairs, worst %.1f s)\n', ...
+    100*Rt.pp.frac(1), 100*Rt.pp.frac(2), Rt.pp.n, Rt.pp.worst);
+fprintf('  stanley      : %5.1f %% within 1 %%, %5.1f %% within 5 %%  (%d pairs, worst %.1f s)\n', ...
+    100*Rt.st.frac(1), 100*Rt.st.frac(2), Rt.st.n, Rt.st.worst);
 
 pPP = p;  pPP.Ld0 = T.pp.best.Ld0;  pPP.kv = T.pp.best.kv;
 pST = p;  pST.ke  = T.st.best.ke;   pST.kSoft = T.st.best.kSoft;
@@ -92,9 +99,9 @@ plot_tuning(T, opt.outdir);
 plot_robustness(S, opt.outdir);
 fprintf('written to %s/\n', opt.outdir);
 
-R = struct('trk', trk, 'p', p, 'tuning', T, 'res', res, 'sweeps', S);
+R = struct('trk', trk, 'p', p, 'tuning', T, 'tuneRobust', Rt, 'res', res, 'sweeps', S);
 save('-mat', fullfile(here,'results.mat'), 'R');
-local_markdown(res, trk, T, S, fullfile(here,'report','kpi_tables.md'));
+local_markdown(res, trk, T, Rt, S, fullfile(here,'report','kpi_tables.md'));
 end
 
 % =========================================================================
@@ -132,7 +139,7 @@ fprintf(' points per D 9.3.2 with tMax = lap at 6 m/s = %.2f s)\n', trk.lapLen/6
 end
 
 % =========================================================================
-function local_markdown(res, trk, T, S, fname)
+function local_markdown(res, trk, T, Rt, S, fname)
 %LOCAL_MARKDOWN  Emit the KPI tables the report includes, so the prose and the
 %   numbers cannot disagree.
 d = fileparts(fname);
@@ -150,7 +157,15 @@ fprintf(fid, '| closure error | %.1e m | closed loop |\n\n', trk.stats.closureEr
 fprintf(fid, '### Tuned gains\n\n');
 fprintf(fid, '| controller | gains | objective J |\n|---|---|---|\n');
 fprintf(fid, '| Pure Pursuit | Ld0 = %.1f m, kv = %.2f s | %.3f s |\n', T.pp.best.Ld0, T.pp.best.kv, T.pp.best.J);
-fprintf(fid, '| Stanley | ke = %.1f 1/s, ksoft = %.1f m/s | %.3f s |\n\n', T.st.best.ke, T.st.best.kSoft, T.st.best.J);
+fprintf(fid, '| Stanley | ke = %.1f 1/s, ksoft = %.2f m/s | %.3f s |\n\n', T.st.best.ke, T.st.best.kSoft, T.st.best.J);
+
+fprintf(fid, '### Gain-space usability\n\n');
+fprintf(fid, 'Fraction of the swept gain grid whose objective lands within x%% of that law''s own best.\n\n');
+fprintf(fid, '| controller | grid pairs | within 1%% | within 5%% | best | worst |\n|---|---|---|---|---|---|\n');
+fprintf(fid, '| Pure Pursuit | %d | %.1f%% | %.1f%% | %.2f s | %.1f s |\n', ...
+    Rt.pp.n, 100*Rt.pp.frac(1), 100*Rt.pp.frac(2), Rt.pp.best, Rt.pp.worst);
+fprintf(fid, '| Stanley | %d | %.1f%% | %.1f%% | %.2f s | %.1f s |\n\n', ...
+    Rt.st.n, 100*Rt.st.frac(1), 100*Rt.st.frac(2), Rt.st.best, Rt.st.worst);
 
 fprintf(fid, '### KPIs, nominal lap\n\n');
 fprintf(fid, '| KPI | %s | %s |\n|---|---|---|\n', res(1).name, res(2).name);

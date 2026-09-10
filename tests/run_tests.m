@@ -6,24 +6,25 @@ function nFail = run_tests()
 %   Run from the repository root:  addpath('src','tests'); run_tests
 addpath('src'); addpath('tests');
 nFail = 0;
-printf('\n== track ==\n');
+fprintf('\n== track ==\n');
 nFail = nFail + t_track();
-printf('\n== steering laws ==\n');
+fprintf('\n== steering laws ==\n');
 nFail = nFail + t_zero_error();
 nFail = nFail + t_pp_ackermann();
 nFail = nFail + t_stanley_circle();
 nFail = nFail + t_straight_convergence();
 nFail = nFail + t_mirror_symmetry();
-printf('\n%s  (%d failure(s))\n', merge(nFail==0,'ALL TESTS PASSED','TESTS FAILED'), nFail);
+if nFail == 0, verdict = 'ALL TESTS PASSED'; else, verdict = 'TESTS FAILED'; end
+fprintf('\n%s  (%d failure(s))\n', verdict, nFail);
 end
 
 % -------------------------------------------------------------------------
 function f = chk(name, cond, fmt, varargin)
 f = ~cond;
 if cond, st = 'PASS'; else, st = 'FAIL'; end
-printf('  [%s] %-34s ', st, name);
-printf(fmt, varargin{:});
-printf('\n');
+fprintf('  [%s] %-34s ', st, name);
+fprintf(fmt, varargin{:});
+fprintf('\n');
 end
 
 % =========================================================================

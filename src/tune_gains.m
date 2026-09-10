@@ -13,16 +13,28 @@ function T = tune_gains(trk, p, varargin)
 %       J = mean over conditions of  ( lapTime + 2*DOO + 10*OC )
 %
 %   which is the rules' own metric (D 10.1.7) rather than a weighted sum with
-%   invented coefficients. It is evaluated over three conditions:
+%   invented coefficients. It is evaluated over five conditions:
 %
 %       nominal            the reference speed profile
-%       +15 % speed        the profile scaled up, i.e. driven beyond its design
-%       20 ms latency      a realistic perception-to-actuation delay
+%       +15 %, +30 % speed the profile scaled up, i.e. driven past its design
+%       20 ms, 100 ms      perception-to-actuation delay, plausible and severe
 %
 %   A single nominal condition would not discriminate: at the design speed both
 %   laws complete the lap without touching a cone, so every gain pair scores
 %   almost the same lap time. The limit conditions are where a lateral
 %   controller earns or loses points, so that is where the gains are chosen.
+%
+%   The choice of conditions is itself a result, and it changed this study's
+%   conclusion. An earlier objective used only nominal, +15 % speed and 20 ms
+%   latency (kept in results_tuning_3cond.mat). Because neither law is anywhere
+%   near its stability limit inside that envelope, the search rewarded the
+%   fastest gains rather than the safest, and picked ke = 14 for Stanley and
+%   Ld0 = 4 for pure pursuit. Both are fragile just outside the envelope:
+%   Stanley at ke = 14 loses the car at 50 ms of delay, and pure pursuit at
+%   Ld0 = 4 starts knocking cones above +20 % speed. Adding the two severe
+%   conditions costs the optimum 0.05 s of nominal lap time and removes both
+%   failures - which is the whole argument for scoring gains outside the design
+%   envelope rather than at it.
 %
 %   A lap that does not complete scores DNF_PENALTY, which dominates any time,
 %   so unstable gain pairs are excluded rather than silently ranked.
@@ -34,7 +46,9 @@ for i = 1:2:numel(varargin), opt.(varargin{i}) = varargin{i+1}; end
 
 conds = { struct('speedScale',1.00) , ...
           struct('speedScale',1.15) , ...
-          struct('latency',0.02)    };
+          struct('speedScale',1.30) , ...
+          struct('latency',0.02)    , ...
+          struct('latency',0.10)    };
 
 % ---- pure pursuit -------------------------------------------------------
 T.pp.Ld0 = [2 3 4 5 6 8];
@@ -45,8 +59,8 @@ for a = 1:numel(T.pp.Ld0)
         q = p;  q.Ld0 = T.pp.Ld0(a);  q.kv = T.pp.kv(b);
         T.pp.J(a,b) = local_score(trk, q, 'pp', conds, opt, DNF_PENALTY);
         if opt.verbose
-            printf('  pp   Ld0=%.1f kv=%.2f  J=%8.3f\n', q.Ld0, q.kv, T.pp.J(a,b));
-            fflush(stdout);
+            fprintf('  pp   Ld0=%.1f kv=%.2f  J=%8.3f\n', q.Ld0, q.kv, T.pp.J(a,b));
+            flush_out();
         end
     end
 end
@@ -63,8 +77,8 @@ for a = 1:numel(T.st.ke)
         q = p;  q.ke = T.st.ke(a);  q.kSoft = T.st.kSoft(b);
         T.st.J(a,b) = local_score(trk, q, 'stanley', conds, opt, DNF_PENALTY);
         if opt.verbose
-            printf('  st   ke=%.1f kSoft=%.1f  J=%8.3f\n', q.ke, q.kSoft, T.st.J(a,b));
-            fflush(stdout);
+            fprintf('  st   ke=%.1f kSoft=%.1f  J=%8.3f\n', q.ke, q.kSoft, T.st.J(a,b));
+            flush_out();
         end
     end
 end

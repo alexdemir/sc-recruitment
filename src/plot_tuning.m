@@ -8,7 +8,9 @@ function plot_tuning(T, outdir)
 %   used here - it invents ordering that the data does not have.
 
 if nargin < 2, outdir = 'figures'; end
-graphics_toolkit('gnuplot');
+if exist('OCTAVE_VERSION', 'builtin')
+    graphics_toolkit('gnuplot');   % Octave: render headless via gnuplot
+end
 cm = local_blue_ramp(64);
 
 maps = { struct('J',T.pp.J, 'xv',T.pp.kv,    'yv',T.pp.Ld0, ...
@@ -29,7 +31,7 @@ for m = 1:numel(maps)
     hi  = max(fin(:));
     Jd(Jd >= 100) = hi;
 
-    f = figure('visible','off','position',[0 0 780 560]);
+    f = fig_new(780, 560);
     imagesc(q.xv, q.yv, Jd);
     set(gca,'ydir','normal');
     colormap(cm);
@@ -40,6 +42,7 @@ for m = 1:numel(maps)
     text(q.bx, q.by, sprintf('  best  %.2f s', q.bJ), 'color', [0.043 0.043 0.043], ...
          'fontsize', 10, 'verticalalignment','bottom');
     set(gca,'xtick',q.xv,'ytick',q.yv,'xcolor',[0.322 0.318 0.306],'ycolor',[0.322 0.318 0.306]);
+    set(gca,'position',[0.11 0.13 0.70 0.76]);   % room for the title and the bar
     xlabel(q.xl); ylabel(q.yl);
     title(q.ti, 'color', [0.043 0.043 0.043], 'fontsize', 11);
     print(f, fullfile(outdir, q.fn), '-dpng', '-r140'); close(f);
