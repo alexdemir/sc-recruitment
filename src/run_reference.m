@@ -1,0 +1,121 @@
+function [log, k] = run_reference(trk, p, ctrl, opts)
+%RUN_REFERENCE  One Autocross lap, integrated in plain MATLAB/Octave.
+%
+%   [log, k] = RUN_REFERENCE(trk, p, ctrl, opts)
+%
+%   ctrl is 'pp' or 'stanley'. Both branches call exactly the same controller
+%   files that the Simulink MATLAB Function blocks read, so this loop is the
+%   reference that verify_equivalence.m holds the Simulink model against.
+%
+%   The plant is integrated with RK4 at opts.dtPlant while the steering command
+%   is held at opts.dtCtrl (100 Hz by default), matching the discrete controller
+%   subsystem and Rate Transition of the Simulink model. A realistic control
+%   rate is part of the comparison: a controller that needs a faster loop to
+%   stay stable is worse even if its continuous-time behaviour is identical.
+%
+%   opts fields (all optional)
+%     dtPlant   1e-3   plant integration step [s]
+%     dtCtrl    1e-2   controller step (ZOH on the steering command) [s]
+%     tMax      120    abort time if the lap never completes [s]
+%     speedScale 1.0   multiplies the reference speed profile (robustness sweep)
+%     latency   0      pose delay seen by the controller [s]
+%     posNoise  0      std. dev. of white position noise [m]
+%     seed      0      RNG seed used when posNoise > 0
+%     standingStart false  start 6 m before the line at rest, per D 6.2.3
+
+if nargin < 4, opts = struct(); end
+d.dtPlant = 1e-3;  d.dtCtrl = 1e-2;  d.tMax = 120;  d.speedScale = 1.0;
+d.latency = 0;     d.posNoise = 0;   d.seed = 0;    d.standingStart = false;
+f = fieldnames(d);
+for i = 1:numel(f)
+    if ~isfield(opts, f{i}), opts.(f{i}) = d.(f{i}); end
+end
+
+PX = trk.x;  PY = trk.y;  PPSI = trk.psi;  N = trk.N;
+vref = speed_profile(trk.kappa, trk.ds, p) * opts.speedScale;
+
+% ---- initial state ------------------------------------------------------
+if opts.standingStart
+    st = [PX(1) - 6*cos(PPSI(1)); PY(1) - 6*sin(PPSI(1)); PPSI(1); 0; 0; 0];
+else
+    st = [PX(1); PY(1); PPSI(1); vref(1); 0; 0];      % flying lap
+end
+iPrev = 1;
+
+% ---- pose delay buffer --------------------------------------------------
+nDelay = max(0, round(opts.latency / opts.dtCtrl));
+buf    = repmat(st(1:3)', nDelay+1, 1);
+rand_state(opts.seed);
+
+nSub  = max(1, round(opts.dtCtrl / opts.dtPlant));
+iTrue = 1;          % index of the true (undelayed, noise-free) state
+winT  = 3;          % a 1 ms step moves the car << 1 sample, so this is ample
+nStep = ceil(opts.tMax / opts.dtPlant);
+log.t = zeros(nStep,1);  log.x = zeros(nStep,1);  log.y = zeros(nStep,1);
+log.psi = zeros(nStep,1);  log.v = zeros(nStep,1);  log.delta = zeros(nStep,1);
+log.deltaCmd = zeros(nStep,1);  log.ey = zeros(nStep,1);  log.vref = zeros(nStep,1);
+n = 0;  t = 0;  prog = 0;  deltaCmd = 0;  lapDone = false;
+
+while ~lapDone && n < nStep
+    % ---- controller, once per dtCtrl, on the delayed and noisy pose -----
+    buf  = [buf(2:end,:); st(1:3)'];
+    pose = buf(1,:);
+    if opts.posNoise > 0
+        pose(1:2) = pose(1:2) + opts.posNoise*randn(1,2);
+    end
+
+    if strcmp(ctrl, 'pp')
+        [deltaCmd, i0] = ctrl_pure_pursuit(pose(1), pose(2), pose(3), st(4), ...
+            PX, PY, PPSI, iPrev, trk.ds, p.L, p.Ld0, p.kv, p.searchWin);
+    else
+        [deltaCmd, i0] = ctrl_stanley(pose(1), pose(2), pose(3), st(4), ...
+            PX, PY, PPSI, iPrev, p.L, p.ke, p.kSoft, p.searchWin);
+    end
+
+    % ---- lap progress, tracked on the unwrapped index ------------------
+    prog  = prog + mod(i0 - iPrev + N/2, N) - N/2;
+    iPrev = i0;
+
+    % ---- plant, nSub RK4 steps with the command held -------------------
+    for sub = 1:nSub
+        [iTrue, eyTrue] = path_nearest(st(1), st(2), PX, PY, PPSI, iTrue, winT);
+        n = n + 1;
+        log.t(n) = t;         log.x(n) = st(1);    log.y(n) = st(2);
+        log.psi(n) = st(3);   log.v(n) = st(4);    log.delta(n) = st(5);
+        log.deltaCmd(n) = deltaCmd;  log.ey(n) = eyTrue;  log.vref(n) = vref(i0);
+
+        st = rk4_step(st, deltaCmd, vref(i0), p, opts.dtPlant);
+        t  = t + opts.dtPlant;
+
+        if prog >= N - 1 && n > nSub
+            lapDone = true;  break;
+        end
+    end
+end
+
+fn = fieldnames(log);
+for i = 1:numel(fn), log.(fn{i}) = log.(fn{i})(1:n); end
+log.completed = lapDone;
+log.ctrl      = ctrl;
+
+if nargout > 1, k = kpi_compute(log, trk, p); end
+end
+
+% =========================================================================
+function st = rk4_step(st, deltaCmd, vref, p, dt)
+k1 = vehicle_ode(st,             deltaCmd, vref, p);
+k2 = vehicle_ode(st + dt/2*k1,   deltaCmd, vref, p);
+k3 = vehicle_ode(st + dt/2*k2,   deltaCmd, vref, p);
+k4 = vehicle_ode(st + dt*k3,     deltaCmd, vref, p);
+st = st + dt/6*(k1 + 2*k2 + 2*k3 + k4);
+end
+
+% =========================================================================
+function rand_state(seed)
+%RAND_STATE  Seed the RNG the same way in MATLAB and Octave.
+if exist('rng', 'file') || exist('rng', 'builtin')
+    rng(seed);
+else
+    randn('seed', seed);  %#ok<RAND>
+end
+end

@@ -1,0 +1,10 @@
+# Keep text files LF in the repository and let git normalise on checkout, so the
+# same working tree is clean on Linux and on Windows MATLAB.
+* text=auto
+*.m   text eol=lf
+*.md  text eol=lf
+# Simulink and MATLAB binaries must never be line-ending converted.
+*.slx binary
+*.mdl binary
+*.mat binary
+*.png binary
