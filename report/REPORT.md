@@ -167,13 +167,15 @@ fixed step, then measures the difference over a full lap:
 
 | Deviation over one lap | Pure Pursuit | Stanley | tolerance |
 |---|---|---|---|
-| position | 1·10⁻¹³ m | 4.4·10⁻¹¹ m | 10⁻³ m |
-| heading | 1·10⁻¹³ rad | 3.3·10⁻¹² rad | 10⁻⁴ rad |
-| speed | 1·10⁻¹³ m/s | 7.4·10⁻¹² m/s | 10⁻³ m/s |
-| steering | 5.0·10⁻¹³ rad | 2.8·10⁻¹² rad | 10⁻⁴ rad |
+| position | 4.45·10⁻¹¹ m | 4.45·10⁻¹¹ m | 10⁻³ m |
+| heading | 3.05·10⁻¹² rad | 3.26·10⁻¹² rad | 10⁻⁴ rad |
+| speed | 8.03·10⁻¹² m/s | 7.40·10⁻¹² m/s | 10⁻³ m/s |
+| steering | 4.99·10⁻¹³ rad | 2.80·10⁻¹² rad | 10⁻⁴ rad |
 
-Agreement at machine precision, eleven orders of magnitude inside the
-tolerances, so the tolerances are not doing any work. The MATLAB reference loop
+Agreement at machine precision - eight orders of magnitude inside the
+tolerances, so the tolerances are not doing any work. The check runs at the
+default gains of `params_vehicle.m`, not the tuned ones, so it tests the model
+rather than a particular operating point. The MATLAB reference loop
 also runs unmodified in GNU Octave, which is how the numbers in this report were
 produced before MATLAB was available.
 
@@ -181,7 +183,157 @@ produced before MATLAB was available.
 
 ## 6. KPIs and the decision rule
 
-<!-- RESULTS -->
+### 6.1 Tuning, and why the choice of conditions is itself a result
+
+Each law's two gains were chosen by grid search against the **same** objective:
+the mean effective competition time over five conditions - nominal, +15 % and
++30 % speed, and 20 ms and 100 ms of pose latency.
+
+| controller | gains | objective J | grid |
+|---|---|---|---|
+| Pure Pursuit | `Ld0` = 5.0 m, `kv` = 0.20 s | 16.720 s | 6 × 6 |
+| Stanley | `ke` = 1.0 1/s, `ksoft` = 0.25 m/s | 16.932 s | 8 × 5 |
+
+![Pure pursuit gain sweep](../figures/fig6_tuning_pp.png)
+![Stanley gain sweep](../figures/fig7_tuning_st.png)
+
+The set of conditions changed the conclusion of this study, so it is worth
+stating plainly. An earlier objective used only nominal, +15 % speed and 20 ms
+latency - an envelope inside which neither law is anywhere near its stability
+limit. The search therefore rewarded the fastest gains rather than the safest
+and returned `ke` = 14 for Stanley and `Ld0` = 4 for pure pursuit. Both are
+fragile just outside that envelope: Stanley at `ke` = 14 loses the car at 50 ms
+of delay (279 s effective time, 32 cones), and pure pursuit at `Ld0` = 4 starts
+knocking cones above +20 % speed. Adding the two severe conditions costs the
+optimum about 0.05 s of nominal lap time and removes both failures. The earlier
+result is kept in `results_tuning_3cond.mat` as the counter-example.
+
+**Gain-space usability** - the fraction of the swept grid landing within x % of
+that law's own best - is reported because a team that mistunes between runs pays
+for it in points:
+
+| controller | grid pairs | within 1 % | within 5 % | best | worst |
+|---|---|---|---|---|---|
+| Pure Pursuit | 36 | 19.4 % | 44.4 % | 16.72 s | 213.4 s |
+| Stanley | 40 | 12.5 % | 15.0 % | 16.93 s | 96.9 s |
+
+Neither law has a broad plateau once 100 ms of delay must be tolerated. This is
+a point **for pure pursuit**: rather more of its gain space clears the bar.
+
+### 6.2 The five KPIs on the nominal lap
+
+![Trajectories](../figures/fig2_trajectories.png)
+![Cross-track error](../figures/fig3_crosstrack.png)
+![Steering](../figures/fig4_steering.png)
+
+| KPI | Pure Pursuit | Stanley | better |
+|---|---|---|---|
+| 1. lap time | **17.960 s** | 18.180 s | PP by 0.22 s |
+| 2. max cross-track error | 0.902 m | **0.129 m** | Stanley by 7.0× |
+| 3. RMS cross-track error | 0.408 m | **0.055 m** | Stanley by 7.4× |
+| 4. RMS steering rate | **8.73 °/s** | 21.12 °/s | PP by 2.4× |
+| 5. cones Down or Out | 0 | 0 | tie |
+| effective time (D 10.1.7) | **17.960 s** | 18.180 s | PP |
+| FSG DV points (D 9.3.2) | **100.00** | 98.87 | PP by 1.13 |
+
+The cross-track trace shows the mechanism: pure pursuit rounds every corner,
+building an error that peaks near 0.9 m at each apex, and its lookahead makes
+that error a smooth, low-frequency shape - hence the low steering activity.
+Stanley holds the centreline to within 0.13 m and pays for it with 2.4 times the
+steering rate.
+
+On this track pure pursuit is marginally ahead on the metric the rules score.
+That 1.13-point lead is the whole case for it, and §6.4 is about whether it
+survives.
+
+### 6.3 Robustness: both are solid, once tuned outside the envelope
+
+![Robustness](../figures/fig8_robustness.png)
+
+| stressor | range | Pure Pursuit | Stanley |
+|---|---|---|---|
+| speed profile | ×0.90 → ×1.30 | 19.98 → 13.79 s, 0 cones | 20.19 → 14.01 s, 0 cones |
+| pose latency | 0 → 100 ms | 17.96 → 18.24 s, 0 cones | 18.18 → 18.42 s, 0 cones |
+| position noise | 0 → 10 cm | 17.96 → 17.97 s | 18.18 → 18.18 s |
+
+Every condition is completed cleanly by both, and the two curves stay roughly
+0.2 s apart throughout: at the tuned gains neither law has a robustness problem
+in this envelope. White position noise up to 10 cm is invisible to both, which
+is expected - it enters the steering command and averages out through the
+actuator lag and the vehicle's own inertia.
+
+That result only holds at these gains, and the maps below show how narrow that
+statement is.
+
+![Gain vs. latency](../figures/fig9_gain_latency.png)
+
+Reading the Stanley panel: at 50 ms of delay the boundary sits between `ke` = 4
+and `ke` = 6; at 100 ms it sits between `ke` = 1 and `ke` = 2. Delay-intolerance
+is therefore a property of the **gain**, not of the law - and the price of
+staying on the safe side is 0.05 s of nominal lap time. The pure pursuit panel
+is almost entirely light: at `Ld0` ≤ 4 it is unconditionally stable across every
+delay tested, and it shows a mild non-monotonicity worth noting - at `Ld0` = 5-6
+with a large speed gain, *adding* delay slightly improves the result, because a
+pose delay reduces the over-anticipation of an over-long lookahead.
+
+### 6.4 The deciding experiment: the width the rules actually guarantee
+
+Everything above runs on a 3.5 m track. **D 8.1.1 guarantees only 3 m.** Since
+pure pursuit's entire advantage is 1.13 points, it is fair to ask whether that
+lead is bought with half a metre of track the organisers are not obliged to give.
+
+![Points vs. track width](../figures/fig10_width.png)
+
+| width | speed | controller | cones | clearance | points |
+|---|---|---|---|---|---|
+| 3.50 m | ×1.00 | Pure Pursuit | 0 | +0.25 m | **100.00** |
+| 3.50 m | ×1.00 | Stanley | 0 | +1.02 m | 98.87 |
+| 3.50 m | ×1.30 | Pure Pursuit | 0 | +0.11 m | **100.00** |
+| 3.50 m | ×1.30 | Stanley | 0 | +1.04 m | 99.09 |
+| 3.25 m | ×1.00 | Pure Pursuit | 0 | +0.12 m | **100.00** |
+| 3.25 m | ×1.00 | Stanley | 0 | +0.90 m | 98.87 |
+| 3.25 m | ×1.30 | Pure Pursuit | 1 | −0.02 m | 92.52 |
+| 3.25 m | ×1.30 | Stanley | 0 | +0.92 m | **100.00** |
+| 3.00 m | ×1.00 | Pure Pursuit | 2 | −0.00 m | 80.29 |
+| 3.00 m | ×1.00 | Stanley | 0 | +0.77 m | **100.00** |
+| 3.00 m | ×1.30 | Pure Pursuit | 6 | −0.14 m | 50.53 |
+| 3.00 m | ×1.30 | Stanley | 0 | +0.79 m | **100.00** |
+
+Clearance is `width/2 − max|ey| − bodyWidth/2`: the gap between the outer edge
+of the car and the cone line at the worst point of the lap. It is what a cone
+penalty actually depends on, and it is what KPI 2 is a proxy for.
+
+Pure pursuit runs on 0.25 m of clearance at 3.5 m and nominal speed, 0.11 m at
++30 %. Narrow the track by 25 cm and it goes negative; at the rules' minimum it
+loses 2 cones at nominal speed and 6 at +30 %, which is 20 and 50 points. Stanley
+never drops below 0.77 m and never touches a cone at any width or speed tested.
+
+### 6.5 Verdict: Stanley
+
+**Stanley is the better controller for DV Autocross**, on these grounds:
+
+1. **Its points do not depend on a generous track.** At the width the rules
+   guarantee it scores 100 at both speeds; pure pursuit scores 80.29 and 50.53.
+   Pure pursuit's 1.13-point advantage exists only at 3.5 m, and no team is told
+   the width in advance.
+2. **Margin, not just accuracy.** 0.77 m of worst-case clearance against 0.25 m
+   is the difference between a controller with room for an unmodelled error -
+   SLAM drift, a mis-detected cone, a wet patch - and one running on the edge.
+   KPIs 2 and 3 (7× better cross-track error) are what buy that margin.
+3. **It gives up almost nothing.** 0.22 s of lap time, and identical robustness
+   to speed, latency and noise once its gain is chosen outside the design
+   envelope.
+
+**Where pure pursuit is the right answer.** It uses 2.4× less steering activity
+(KPI 4), which matters if the steering actuator is thermally or mechanically the
+binding constraint. And rather more of its gain space tolerates a 100 ms loop
+(19.4 % against 12.5 % within 1 %), so if the perception-to-actuation delay
+cannot be characterised, pure pursuit is the safer thing to hand to a team that
+must tune at the event. If the track is known to be wide, it is also marginally
+faster.
+
+**One number, if only one is wanted:** FSG DV Autocross points at the rules'
+minimum 3 m width and +30 % speed - **Stanley 100.00, pure pursuit 50.53.**
 
 ---
 

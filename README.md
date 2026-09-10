@@ -10,6 +10,29 @@ model, the KPIs - is in this repository, so the control laws can be read,
 checked and defended rather than taken on trust from a library block. The plain
 MATLAB parts also run unmodified in GNU Octave.
 
+## Result
+
+**Stanley**, on the width the rules actually guarantee.
+
+| | Pure Pursuit | Stanley |
+|---|---|---|
+| lap time | **17.96 s** | 18.18 s |
+| max cross-track error | 0.902 m | **0.129 m** |
+| RMS cross-track error | 0.408 m | **0.055 m** |
+| RMS steering rate | **8.73 °/s** | 21.12 °/s |
+| cones down or out (3.5 m track) | 0 | 0 |
+| DV Autocross points, 3.5 m track | **100.00** | 98.87 |
+| DV Autocross points, **3.0 m track** (D 8.1.1 minimum) | 80.29 | **100.00** |
+| the same, at +30 % speed | 50.53 | **100.00** |
+
+Pure pursuit is 0.22 s a lap faster and leads by 1.13 points - but only on a
+track wider than the rules promise. At the 3 m minimum its 0.25 m of clearance
+to the cone line goes negative and it starts collecting 2 s penalties, while
+Stanley never drops below 0.77 m of clearance at any width or speed tested.
+Full argument, and the case for pure pursuit where the steering actuator or an
+uncharacterised loop delay is the binding constraint, in
+[report/REPORT.md](report/REPORT.md).
+
 ## Quick start
 
 ```matlab
@@ -74,7 +97,11 @@ src/    track_autox.m      cone track and centreline geometry
         kpi_compute.m      KPIs, cone contact, off-course, effective time
         fsg_points.m       DV Autocross score
         tune_gains.m       grid search, one shared objective
+        tuning_robustness.m  how much of each gain space is usable
+        sweep_width.m      points vs. track width, down to the 3 m minimum
+        sweep_gain_latency.m  stability boundary in gain-vs-delay space
         plot_*.m           figures
+        fig_new.m, fig_axes.m, fig_legend.m   figure surface and furniture
 build_model.m              generates autox_lateral.slx from the same sources
 verify_equivalence.m       Simulink vs. reference-loop agreement
 run_all.m                  end-to-end driver

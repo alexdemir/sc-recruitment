@@ -92,16 +92,27 @@ for j = 1:numel(S.noise.x)
     fprintf('  noise %4.0f cm : PP %6.2f s   ST %6.2f s\n', S.noise.x(j)*100, S.noise.pp(j), S.noise.st(j));
 end
 
+% ---- track width: the rules allow 3 m, this study used 3.5 m -----------
+fprintf('\n=== track width sweep (D 8.1.1 allows 3 m) ===\n');
+Wd = sweep_width(p, T, 'dtPlant', dt);
+
+% ---- gain vs. loop delay: law or tuning? -------------------------------
+fprintf('\n=== gain vs. latency maps ===\n');
+G = sweep_gain_latency(trk, p, 'verbose', false);
+
 % ---- figures and results ------------------------------------------------
 fprintf('\n=== figures ===\n');
 plot_results(trk, p, res, opt.outdir);
 plot_tuning(T, opt.outdir);
 plot_robustness(S, opt.outdir);
+plot_width(Wd, opt.outdir);
+plot_gain_latency(G, T, opt.outdir);
 fprintf('written to %s/\n', opt.outdir);
 
-R = struct('trk', trk, 'p', p, 'tuning', T, 'tuneRobust', Rt, 'res', res, 'sweeps', S);
+R = struct('trk', trk, 'p', p, 'tuning', T, 'tuneRobust', Rt, 'res', res, ...
+           'sweeps', S, 'width', Wd, 'gainLatency', G);
 save('-mat', fullfile(here,'results.mat'), 'R');
-local_markdown(res, trk, T, Rt, S, fullfile(here,'report','kpi_tables.md'));
+local_markdown(res, trk, T, Rt, S, Wd, fullfile(here,'report','kpi_tables.md'));
 end
 
 % =========================================================================
@@ -139,7 +150,7 @@ fprintf(' points per D 9.3.2 with tMax = lap at 6 m/s = %.2f s)\n', trk.lapLen/6
 end
 
 % =========================================================================
-function local_markdown(res, trk, T, Rt, S, fname)
+function local_markdown(res, trk, T, Rt, S, Wd, fname)
 %LOCAL_MARKDOWN  Emit the KPI tables the report includes, so the prose and the
 %   numbers cannot disagree.
 d = fileparts(fname);
@@ -190,6 +201,18 @@ for j = 1:numel(S.latency.x)
 end
 for j = 1:numel(S.noise.x)
     fprintf(fid, '| position noise | %.0f cm | %.2f | %.2f |\n', S.noise.x(j)*100, S.noise.pp(j), S.noise.st(j));
+end
+
+fprintf(fid, '\n### Track width, at and above the rules minimum\n\n');
+fprintf(fid, 'Clearance = width/2 - max|ey| - bodyWidth/2: the room left to the cone line at the worst point of the lap.\n\n');
+fprintf(fid, '| width | speed | controller | cones | clearance | eff. time | points |\n|---|---|---|---|---|---|---|\n');
+for a = 1:numel(Wd.width)
+    for b = 1:numel(Wd.speed)
+        fprintf(fid, '| %.2f m | x%.2f | Pure Pursuit | %d | %+.2f m | %.2f s | %.2f |\n', ...
+            Wd.width(a), Wd.speed(b), Wd.ppDoo(a,b), Wd.ppClear(a,b), Wd.ppTeff(a,b), Wd.ppPts(a,b));
+        fprintf(fid, '| %.2f m | x%.2f | Stanley | %d | %+.2f m | %.2f s | %.2f |\n', ...
+            Wd.width(a), Wd.speed(b), Wd.stDoo(a,b), Wd.stClear(a,b), Wd.stTeff(a,b), Wd.stPts(a,b));
+    end
 end
 fclose(fid);
 end
