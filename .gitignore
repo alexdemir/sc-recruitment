@@ -12,3 +12,16 @@ octave-workspace
 # The small sweep results are kept, since they save a long grid search in Octave
 # and results_tuning_3cond.mat is cited in the report.
 results.mat
+
+# Sweep outputs that run_all rewrites. Only results_tuning.mat is tracked: the
+# code loads it for the tuned gains, and regenerating it is a 380-simulation
+# grid search.
+results_width.mat
+results_gain_latency.mat
+results_lookahead.mat
+results_tuning_3cond.mat
+
+# Generated outputs: run_all.m rewrites both on every run, so they are build
+# artefacts rather than sources.
+report/kpi_tables.md
+figures/

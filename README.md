@@ -31,7 +31,7 @@ to the cone line goes negative and it starts collecting 2 s penalties, while
 Stanley never drops below 0.77 m of clearance at any width or speed tested.
 Full argument, and the case for pure pursuit where the steering actuator or an
 uncharacterised loop delay is the binding constraint, in
-[report/REPORT.md](report/REPORT.md).
+[report.pdf](report.pdf).
 
 ## How to run
 
@@ -77,10 +77,9 @@ run_all('verbose', true)    % print every sweep point, not just the KPI table
 - `figures/fig0` … `fig10` — model diagram, track, trajectories, cross-track
   error, steering, speed, two gain-sweep maps, robustness, gain-vs-latency,
   points-vs-track-width
-- `report/kpi_tables.md` — the tables the report includes, regenerated
 
-Every number and figure in the reports comes from this one command, so the prose
-cannot drift from the code.
+The figures are generated output and are not committed; run `run_all` to produce
+them. Every number in `report.pdf` comes from this one command.
 
 ### Which file does what
 
@@ -96,8 +95,7 @@ cannot drift from the code.
 | `src/vehicle_ode.m` | kinematic bicycle + actuator + longitudinal PI |
 | `src/run_reference.m` | RK4 reference loop, also runs in Octave |
 | `src/kpi_compute.m`, `src/fsg_points.m` | the KPIs and the competition score |
-| `report/SUMMARY.md` | one-page report |
-| `report/REPORT.md` | full report with every figure and derivation |
+| `report.pdf` | the report: what was built, the KPIs, the verdict |
 
 ## What is being compared
 
