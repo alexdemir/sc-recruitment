@@ -24,7 +24,8 @@ function mdl = build_model(trk, p, varargin)
 if nargin < 1 || isempty(trk), trk = track_autox(); end
 if nargin < 2 || isempty(p),   p   = params_vehicle(); end
 opt = struct('name','autox_lateral', 'open', false, 'ctrl', 0, ...
-             'dtCtrl', 0.01, 'dtPlant', 1e-3, 'stopTime', 60);
+             'dtCtrl', 0.01, 'dtPlant', 1e-3, 'stopTime', 60, ...
+             'liveView', false);
 for i = 1:2:numel(varargin), opt.(varargin{i}) = varargin{i+1}; end
 mdl = opt.name;
 
@@ -76,6 +77,16 @@ add_block('simulink/Signal Routing/Multiport Switch', [mdl '/select index'], ...
           'Inputs','2', 'DataPortOrder','Zero-based contiguous', ...
           'Position',[1120 300 1140 420]);
 
+% Live trajectory while the simulation runs. XY Graph is a stock Simulink sink,
+% so this costs no extra toolbox; the axis limits are taken from the track so
+% the whole lap is in frame from the first step.
+if opt.liveView
+    add_block('simulink/Sinks/XY Graph', [mdl '/live view'], ...
+              'xmin', num2str(min(trk.x) - 5), 'xmax', num2str(max(trk.x) + 5), ...
+              'ymin', num2str(min(trk.y) - 5), 'ymax', num2str(max(trk.y) + 5), ...
+              'st', num2str(opt.dtCtrl), 'Position',[760 40 800 80]);
+end
+
 add_block('simulink/Sinks/To Workspace', [mdl '/log_state'], ...
           'VariableName','st_log', 'SaveFormat','Structure With Time', ...
           'Position',[620 60 680 90]);
@@ -117,9 +128,14 @@ lines = { 'plant/1',            'state/1'
           'select steering/1',  'plant/2'
           'speed reference/1',  'plant/3'
           'state/1',            'plant/1'
-          'select steering/1',  'log_delta_cmd/1' };
+          'select steering/1',  'log_delta_cmd/1'
+          };
 for i = 1:size(lines,1)
     add_line(mdl, lines{i,1}, lines{i,2}, 'autorouting','on');
+end
+if opt.liveView
+    add_line(mdl, 'split/1', 'live view/1', 'autorouting','on');
+    add_line(mdl, 'split/2', 'live view/2', 'autorouting','on');
 end
 
 % unused demux outputs (delta and eInt are not controller inputs)
