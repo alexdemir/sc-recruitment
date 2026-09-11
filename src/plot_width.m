@@ -1,12 +1,4 @@
 function plot_width(W, outdir)
-%PLOT_WIDTH  DV Autocross points against track width.
-%
-%   Two panels, nominal speed and +30 %, sharing one y axis so the two can be
-%   compared at a glance. The dashed marker at 3 m is the width the rules
-%   permit; everything to the right of it is track the organisers are not
-%   obliged to give. Cone counts are labelled directly on the points that lost
-%   any, because the drop is caused by cones and the reader should not have to
-%   infer that.
 
 if nargin < 2, outdir = 'figures'; end
 if exist('OCTAVE_VERSION', 'builtin')

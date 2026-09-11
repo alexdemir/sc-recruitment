@@ -1,21 +1,4 @@
 function W = sweep_width(p, T, varargin)
-%SWEEP_WIDTH  Points against track width, at the rules' lower bound.
-%
-%   W = SWEEP_WIDTH(p, T)
-%
-%   D 8.1.1 sets the minimum Autocross track width at 3 m, and the organisers
-%   are free to use it. The rest of this study runs on 3.5 m, so a controller
-%   could be leading on points purely because of half a metre the rules do not
-%   guarantee. This sweep removes that assumption: the same tuned gains are run
-%   at 3.50, 3.25 and 3.00 m, at nominal speed and at +30 %, and scored.
-%
-%   Also recorded is the clearance
-%
-%       clearance = width/2 - max|ey| - bodyWidth/2
-%
-%   the room left between the outer edge of the car and the cone line at the
-%   worst point of the lap. It is the quantity a cone penalty actually depends
-%   on, and it is what the max cross-track KPI is a proxy for.
 
 opt = struct('dtPlant', 1e-3, 'verbose', true);
 for i = 1:2:numel(varargin), opt.(varargin{i}) = varargin{i+1}; end
@@ -54,7 +37,6 @@ for a = 1:n
 end
 end
 
-% =========================================================================
 function w = local_plural(n)
 if n == 1, w = 'cone'; else, w = 'cones'; end
 end

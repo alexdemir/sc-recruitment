@@ -1,25 +1,4 @@
 function mdl = build_model(trk, p, varargin)
-%BUILD_MODEL  Create the Simulink comparison model programmatically.
-%
-%   mdl = BUILD_MODEL()            default track and parameters
-%   mdl = BUILD_MODEL(trk, p)      explicit track and parameters
-%   BUILD_MODEL(..., 'open', true) open the diagram after building
-%
-%   The model is built by script rather than shipped as a binary .slx, for three
-%   reasons: it is a plain-text diff in git, it cannot be locked to one MATLAB
-%   release, and the controller blocks read the very same .m files that the
-%   reference loop calls, so the two cannot drift apart.
-%
-%   Structure
-%     state          one 6-element Integrator: x, y, psi, v, delta, eInt
-%     plant          plant_block -> vehicle_ode, the continuous derivative
-%     ZOH + charts   the two steering laws, sampled at 100 Hz
-%     switch         CTRL_SEL picks which command reaches the actuator,
-%                    0 = pure pursuit, 1 = Stanley (the switch is zero-based)
-%     unit delay     carries the centreline index between control steps
-%
-%   Both controllers are computed every step and one is selected, so a single
-%   run also records what the other law would have commanded.
 
 if nargin < 1 || isempty(trk), trk = track_autox(); end
 if nargin < 2 || isempty(p),   p   = params_vehicle(); end
@@ -36,12 +15,9 @@ if bdIsLoaded(mdl), close_system(mdl, 0); end
 if exist([mdl '.slx'], 'file'), delete([mdl '.slx']); end
 new_system(mdl);
 
-% ---- model workspace: everything the blocks resolve ---------------------
 vref = speed_profile(trk.kappa, trk.ds, p);
 ST0  = [trk.x(1); trk.y(1); trk.psi(1); vref(1); 0; 0];
 W = get_param(mdl, 'ModelWorkspace');
-% Parameter-scope chart data resolves by NAME, so these must be spelled exactly
-% as the arguments of the controller and plant functions.
 vars = { 'PX', trk.x;   'PY', trk.y;     'PPSI', trk.psi;  'VREF', vref; ...
          'ds', trk.ds;  'L', p.L;        'Ld0', p.Ld0;     'kv', p.kv; ...
          'ke', p.ke;    'kSoft', p.kSoft; 'win', p.searchWin; ...
@@ -49,7 +25,6 @@ vars = { 'PX', trk.x;   'PY', trk.y;     'PPSI', trk.psi;  'VREF', vref; ...
          'DTCTRL', opt.dtCtrl };
 for i = 1:size(vars,1), W.assignin(vars{i,1}, vars{i,2}); end
 
-% ---- blocks -------------------------------------------------------------
 add_block('simulink/Continuous/Integrator', [mdl '/state'], ...
           'InitialCondition','ST0', 'Position',[520 120 560 160]);
 add_block('simulink/Discrete/Zero-Order Hold', [mdl '/hold 100 Hz'], ...
@@ -77,9 +52,6 @@ add_block('simulink/Signal Routing/Multiport Switch', [mdl '/select index'], ...
           'Inputs','2', 'DataPortOrder','Zero-based contiguous', ...
           'Position',[1120 300 1140 420]);
 
-% Live trajectory while the simulation runs. XY Graph is a stock Simulink sink,
-% so this costs no extra toolbox; the axis limits are taken from the track so
-% the whole lap is in frame from the first step.
 if opt.liveView
     add_block('simulink/Sinks/XY Graph', [mdl '/live view'], ...
               'xmin', num2str(min(trk.x) - 5), 'xmax', num2str(max(trk.x) + 5), ...
@@ -94,7 +66,6 @@ add_block('simulink/Sinks/To Workspace', [mdl '/log_delta_cmd'], ...
           'VariableName','dcmd_log', 'SaveFormat','Structure With Time', ...
           'Position',[1220 100 1280 130]);
 
-% ---- block functions: the same source files the reference loop uses -----
 local_set_chart(mdl, 'plant',            fullfile(here,'src','plant_block.m'),        {'P'});
 local_set_chart(mdl, 'speed reference',  fullfile(here,'src','vref_block.m'),         {'VREF'});
 local_set_chart(mdl, 'Pure Pursuit',     fullfile(here,'src','ctrl_pure_pursuit.m'), ...
@@ -102,7 +73,6 @@ local_set_chart(mdl, 'Pure Pursuit',     fullfile(here,'src','ctrl_pure_pursuit.
 local_set_chart(mdl, 'Stanley',          fullfile(here,'src','ctrl_stanley.m'), ...
                 {'PX','PY','PPSI','L','ke','kSoft','win'});
 
-% ---- wiring -------------------------------------------------------------
 lines = { 'plant/1',            'state/1'
           'state/1',            'hold 100 Hz/1'
           'state/1',            'log_state/1'
@@ -138,14 +108,12 @@ if opt.liveView
     add_line(mdl, 'split/2', 'live view/2', 'autorouting','on');
 end
 
-% unused demux outputs (delta and eInt are not controller inputs)
 for k = [5 6]
     add_block('simulink/Sinks/Terminator', sprintf('%s/term%d', mdl, k), ...
               'Position',[745 240+45*k 760 255+45*k]);
     add_line(mdl, sprintf('split/%d', k), sprintf('term%d/1', k), 'autorouting','on');
 end
 
-% ---- solver and sample time -------------------------------------------
 set_param(mdl, 'SolverType','Fixed-step', 'Solver','ode4', ...
                'FixedStep', num2str(opt.dtPlant), 'StopTime', num2str(opt.stopTime), ...
                'SaveOutput','off', 'SaveTime','off');
@@ -156,11 +124,7 @@ fprintf('built %s.slx  (%d blocks, %d lines)\n', mdl, ...
         numel(find_system(mdl,'SearchDepth',1,'Type','Block')), size(lines,1)+2);
 end
 
-% =========================================================================
 function local_set_chart(mdl, blk, srcFile, paramNames)
-%LOCAL_SET_CHART  Load a .m file into a MATLAB Function block and mark the
-%   arguments that are constants as Parameter-scope data, so they resolve from
-%   the model workspace instead of becoming input ports.
 ch = find(sfroot, '-isa','Stateflow.EMChart', 'Path', [mdl '/' blk]);
 ch.Script = fileread(srcFile);
 d = ch.find('-isa','Stateflow.Data');

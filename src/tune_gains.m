@@ -1,43 +1,4 @@
 function T = tune_gains(trk, p, varargin)
-%TUNE_GAINS  Grid search of both controllers' gains under one shared objective.
-%
-%   T = TUNE_GAINS(trk, p)
-%
-%   Each controller has two gains: pure pursuit (Ld0, kv) and Stanley
-%   (ke, kSoft). Both grids are scored with the SAME objective, so neither law
-%   can be accused of having been handed a tuning advantage - the first thing
-%   worth asking of any controller comparison.
-%
-%   The objective is the mean effective competition time
-%
-%       J = mean over conditions of  ( lapTime + 2*DOO + 10*OC )
-%
-%   which is the rules' own metric (D 10.1.7) rather than a weighted sum with
-%   invented coefficients. It is evaluated over five conditions:
-%
-%       nominal            the reference speed profile
-%       +15 %, +30 % speed the profile scaled up, i.e. driven past its design
-%       20 ms, 100 ms      perception-to-actuation delay, plausible and severe
-%
-%   A single nominal condition would not discriminate: at the design speed both
-%   laws complete the lap without touching a cone, so every gain pair scores
-%   almost the same lap time. The limit conditions are where a lateral
-%   controller earns or loses points, so that is where the gains are chosen.
-%
-%   The choice of conditions is itself a result, and it changed this study's
-%   conclusion. An earlier objective used only nominal, +15 % speed and 20 ms
-%   latency (kept in results_tuning_3cond.mat). Because neither law is anywhere
-%   near its stability limit inside that envelope, the search rewarded the
-%   fastest gains rather than the safest, and picked ke = 14 for Stanley and
-%   Ld0 = 4 for pure pursuit. Both are fragile just outside the envelope:
-%   Stanley at ke = 14 loses the car at 50 ms of delay, and pure pursuit at
-%   Ld0 = 4 starts knocking cones above +20 % speed. Adding the two severe
-%   conditions costs the optimum 0.05 s of nominal lap time and removes both
-%   failures - which is the whole argument for scoring gains outside the design
-%   envelope rather than at it.
-%
-%   A lap that does not complete scores DNF_PENALTY, which dominates any time,
-%   so unstable gain pairs are excluded rather than silently ranked.
 
 DNF_PENALTY = 1e3;
 
@@ -50,7 +11,6 @@ conds = { struct('speedScale',1.00) , ...
           struct('latency',0.02)    , ...
           struct('latency',0.10)    };
 
-% ---- pure pursuit -------------------------------------------------------
 T.pp.Ld0 = [2 3 4 5 6 8];
 T.pp.kv  = [0.05 0.10 0.20 0.30 0.40 0.50];
 T.pp.J   = nan(numel(T.pp.Ld0), numel(T.pp.kv));
@@ -68,7 +28,6 @@ end
 [a, b]  = ind2sub(size(T.pp.J), i1);
 T.pp.best = struct('Ld0', T.pp.Ld0(a), 'kv', T.pp.kv(b), 'J', T.pp.J(a,b));
 
-% ---- stanley ------------------------------------------------------------
 T.st.ke    = [1 2 3 4 6 9 14 20];
 T.st.kSoft = [0.25 0.5 1.0 2.0 4.0];
 T.st.J     = nan(numel(T.st.ke), numel(T.st.kSoft));
@@ -91,7 +50,6 @@ T.dnfPenalty  = DNF_PENALTY;
 T.dtPlantUsed = opt.dtPlant;
 end
 
-% =========================================================================
 function J = local_score(trk, q, ctrl, conds, opt, dnf)
 J = 0;
 for c = 1:numel(conds)

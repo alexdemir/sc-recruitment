@@ -1,36 +1,22 @@
 function plot_results(trk, p, res, outdir)
-%PLOT_RESULTS  Figures for the controller comparison report.
-%
-%   plot_results(trk, p, res, outdir)
-%
-%   res is a struct array with fields .name .log .kpi, one entry per controller.
-%
-%   Figure conventions, applied everywhere: two series carry the two fixed
-%   categorical hues in a fixed order (never cycled), every multi-series figure
-%   has a legend, lines are thin, the grid is recessive, and no figure uses two
-%   y scales. Cone colours in the layout figure are the rule colours (blue on
-%   the left boundary, yellow on the right, orange for the start gate) because
-%   there they carry meaning; in the trajectory figure the cones drop to grey so
-%   that the two trajectories own the colour.
 
 if nargin < 4, outdir = 'figures'; end
 if ~exist(outdir, 'dir'), mkdir(outdir); end
 if exist('OCTAVE_VERSION', 'builtin')
-    graphics_toolkit('gnuplot');   % Octave: render headless via gnuplot
+    graphics_toolkit('gnuplot');
 end
 
-C  = struct('s1',[0.165 0.471 0.839], ...   % #2a78d6  categorical slot 1
-            's2',[0.922 0.408 0.204], ...   % #eb6834  categorical slot 2
-            'ink',[0.043 0.043 0.043], ...  % primary text
-            'ink2',[0.322 0.318 0.306], ... % secondary text
+C  = struct('s1',[0.165 0.471 0.839], ...
+            's2',[0.922 0.408 0.204], ...
+            'ink',[0.043 0.043 0.043], ...
+            'ink2',[0.322 0.318 0.306], ...
             'grid',[0.85 0.85 0.84], ...
             'cone',[0.72 0.72 0.71], ...
-            'blue',[0.10 0.35 0.75], ...    % rule cone colours
+            'blue',[0.10 0.35 0.75], ...
             'yellow',[0.90 0.70 0.05], ...
             'orange',[0.95 0.45 0.10]);
 LW = 2;
 
-% ---------------------------------------------------------------- fig 1: layout
 f = fig_new(1100, 850);
 hold on;
 plot(trk.x, trk.y, '--', 'color', C.grid, 'linewidth', 1);
@@ -49,7 +35,6 @@ fig_legend({'centreline','left boundary (blue)','right boundary (yellow)','start
            'northeastoutside');
 print(f, fullfile(outdir,'fig1_track.png'), '-dpng', '-r140'); close(f);
 
-% ----------------------------------------------------- fig 2: trajectories
 f = fig_new(1100, 850);
 hold on;
 plot(trk.coneL(:,1), trk.coneL(:,2), '.', 'color', C.cone, 'markersize', 8);
@@ -64,7 +49,6 @@ title('Driven trajectories over the cone corridor', 'color', C.ink, 'fontsize', 
 fig_legend([{'cones',''}, {res.name}], 'northeastoutside');
 print(f, fullfile(outdir,'fig2_trajectories.png'), '-dpng', '-r140'); close(f);
 
-% ------------------------------------------------------ fig 3: cross-track
 f = fig_new(1100, 450);
 hold on;
 half = trk.width/2;
@@ -81,7 +65,6 @@ title('Cross-track error (positive = left of the centreline)', 'color', C.ink, '
 fig_legend([{'track edge',''}, {res.name}], 'northeastoutside');
 print(f, fullfile(outdir,'fig3_crosstrack.png'), '-dpng', '-r140'); close(f);
 
-% --------------------------------------------------------- fig 4: steering
 f = fig_new(1100, 450);
 hold on;
 for i = 1:numel(res)
@@ -97,7 +80,6 @@ title('Steering angle at the road wheels', 'color', C.ink, 'fontsize', 11);
 fig_legend([{res.name}, {'actuator limit'}], 'northeastoutside');
 print(f, fullfile(outdir,'fig4_steering.png'), '-dpng', '-r140'); close(f);
 
-% ------------------------------------------------------------ fig 5: speed
 f = fig_new(1100, 450);
 hold on;
 plot(trk.s, speed_profile(trk.kappa, trk.ds, p), '--', 'color', C.grid, 'linewidth', 1.5);
@@ -113,9 +95,7 @@ fig_legend([{'reference profile'}, {res.name}], 'northeastoutside');
 print(f, fullfile(outdir,'fig5_speed.png'), '-dpng', '-r140'); close(f);
 end
 
-% =========================================================================
 function s = local_arclen(log, trk)
-%LOCAL_ARCLEN  Distance travelled along the lap, for the x axis of the traces.
 s = [0; cumsum(hypot(diff(log.x), diff(log.y)))];
 s = s * (trk.lapLen / max(s(end), eps));
 end

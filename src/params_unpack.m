@@ -1,6 +1,4 @@
 function p = params_unpack(P)
-%PARAMS_UNPACK  Rebuild the vehicle parameter struct from params_pack's vector.
-%   Codegen-safe: fixed field set, scalar assignments, no dynamic fields.
 p.L          = P(1);   p.bodyLen  = P(2);   p.bodyWid = P(3);
 p.bodyCtrOff = P(4);   p.coneR    = P(5);
 p.dMax       = P(6);   p.dRateMax = P(7);   p.tauSteer = P(8);

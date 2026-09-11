@@ -233,7 +233,6 @@ a point **for pure pursuit**: rather more of its gain space clears the bar.
 | 3. RMS cross-track error | 0.408 m | **0.055 m** | Stanley by 7.4× |
 | 4. RMS steering rate | **8.73 °/s** | 21.12 °/s | PP by 2.4× |
 | 5. cones Down or Out | 0 | 0 | tie |
-| 6. control-step cost | 1.4-1.8 µs | **0.9-1.0 µs** | Stanley by ~1.5× |
 | effective time (D 10.1.7) | **17.960 s** | 18.180 s | PP |
 | FSG DV points (D 9.3.2) | **100.00** | 98.87 | PP by 1.13 |
 
@@ -300,8 +299,8 @@ deviating from the reference costs time instead of saving it - the ranking on
 lap time would be expected to invert. That experiment is not in this study; see
 §7.
 
-A sixth quantity, cheap to measure and specific to a driverless car: the cost of
-one control step. Pure pursuit costs 1.4-1.8 µs per call against Stanley's
+One further quantity, measured but not counted as a KPI, is specific to a
+driverless car: the cost of one control step. Pure pursuit costs 1.4-1.8 µs per call against Stanley's
 0.9-1.0 µs, because its goal-point search sits on top of the nearest-point
 search that both perform. This is a wall-clock benchmark, so the absolute
 figures move by tens of percent between runs and only the ratio - about 1.5× -

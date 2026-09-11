@@ -1,9 +1,4 @@
 function nFail = run_tests()
-%RUN_TESTS  Analytical unit tests for the track and the two steering laws.
-%
-%   These are the correctness argument for the controllers: each law is checked
-%   against a closed-form result rather than against another implementation.
-%   Run from the repository root:  addpath('src','tests'); run_tests
 addpath('src'); addpath('tests');
 nFail = 0;
 fprintf('\n== track ==\n');
@@ -18,7 +13,6 @@ if nFail == 0, verdict = 'ALL TESTS PASSED'; else, verdict = 'TESTS FAILED'; end
 fprintf('\n%s  (%d failure(s))\n', verdict, nFail);
 end
 
-% -------------------------------------------------------------------------
 function f = chk(name, cond, fmt, varargin)
 f = ~cond;
 if cond, st = 'PASS'; else, st = 'FAIL'; end
@@ -27,9 +21,7 @@ fprintf(fmt, varargin{:});
 fprintf('\n');
 end
 
-% =========================================================================
 function f = t_track()
-%T_TRACK  Rule compliance, exact closure and geometric continuity.
 trk = track_autox();  s = trk.stats;  f = 0;
 f = f + chk('lap length 200-500 m (D 8.1.2)', s.lapLen>200 && s.lapLen<500, '%.1f m', s.lapLen);
 f = f + chk('min turning diameter >= 9 m', 2*s.minRadius >= 9, '%.2f m dia', 2*s.minRadius);
@@ -37,18 +29,13 @@ f = f + chk('straights <= 80 m (D 8.1.1)', s.maxStraight <= 80, '%.1f m', s.maxS
 f = f + chk('track width >= 3 m (D 8.1.1)', s.width >= 3, '%.2f m', s.width);
 f = f + chk('closed loop: total turn 360 deg', abs(abs(s.turnDegrees)-360) < 1e-6, '%.4f deg', s.turnDegrees);
 f = f + chk('closure error < 1 mm', abs(s.closureError) < 1e-3, '%.2e m', s.closureError);
-% heading must be continuous: no jump larger than what one sample can turn
 dpsi = abs(wrap_pi(diff(trk.psi)));
 f = f + chk('heading continuous', max(dpsi) < 1.5*trk.ds/s.minRadius, 'max step %.4f rad', max(dpsi));
-% curvature must match the commanded fillet radii (or be zero on straights)
 kNZ = abs(trk.kappa(abs(trk.kappa) > 1e-9));
 f = f + chk('curvature matches fillet radii', all(min(abs(1./kNZ - trk.stats.radii'),[],2) < 1e-9), '%d arc samples', numel(kNZ));
 end
 
-% =========================================================================
 function f = t_zero_error()
-%T_ZERO_ERROR  On the path with zero heading error, both laws must command
-%   exactly zero steering. Catches offset and sign-convention slips.
 p = params_vehicle();  pth = mk_path('straight', 0);  i0 = 200;
 [dpp, ~] = ctrl_pure_pursuit(pth.x(i0), pth.y(i0), 0, 10, pth.x, pth.y, pth.psi, i0, pth.ds, p.L, p.Ld0, p.kv, p.searchWin);
 [dst, ~] = ctrl_stanley     (pth.x(i0), pth.y(i0), 0, 10, pth.x, pth.y, pth.psi, i0, p.L, p.ke, p.kSoft, p.searchWin);
@@ -56,13 +43,7 @@ f = chk('pure pursuit: delta = 0', abs(dpp) < 1e-12, '%.2e rad', dpp) + ...
     chk('stanley: delta = 0',      abs(dst) < 1e-12, '%.2e rad', dst);
 end
 
-% =========================================================================
 function f = t_pp_ackermann()
-%T_PP_ACKERMANN  Closed-form check of the pure pursuit law.
-%   With the rear axle on a circle of radius R and zero cross-track error, the
-%   goal point at lookahead Ld subtends sin(alpha) = Ld/(2R), so the law
-%   delta = atan(2*L*sin(alpha)/Ld) must return exactly the Ackermann angle
-%   atan(L/R), independently of Ld. This is a proof, not a regression baseline.
 p = params_vehicle();  f = 0;
 for R = [8 15 30 60]
     pth = mk_path('circle', R);  i0 = 400;
@@ -74,14 +55,7 @@ for R = [8 15 30 60]
 end
 end
 
-% =========================================================================
 function f = t_stanley_circle()
-%T_STANLEY_CIRCLE  Stanley is derived at the front axle, so on a circle the
-%   front axle sits outside the centreline by sqrt(R^2+L^2)-R and the path
-%   tangent there is rotated by atan(L/R). Both terms of the law are therefore
-%   exercised, and the commanded angle must stay within a few degrees of
-%   Ackermann. This pins the front-axle reference: feeding the rear axle
-%   instead changes the result by a wide margin and fails the check.
 p = params_vehicle();  f = 0;
 for R = [15 30]
     pth = mk_path('circle', R);  i0 = 400;
@@ -93,11 +67,7 @@ for R = [15 30]
 end
 end
 
-% =========================================================================
 function f = t_straight_convergence()
-%T_STRAIGHT_CONVERGENCE  Released 1 m off a straight line, both controllers
-%   must drive the offset to under 1 cm and must not overshoot the far side by
-%   more than the offset they started with.
 p = params_vehicle();  f = 0;
 trk = struct('x', [], 'y', [], 'psi', [], 'kappa', [], 's', [], 'ds', 0.25, 'N', 4000);
 pth = mk_path('straight', 0);
@@ -111,12 +81,7 @@ for c = {'pp','stanley'}
 end
 end
 
-% =========================================================================
 function f = t_mirror_symmetry()
-%T_MIRROR_SYMMETRY  Mirroring the track in y must negate every lateral signal
-%   and leave the KPIs unchanged. This is the test that catches a wrong sign in
-%   the cross-track error, in the left normal, or in the Stanley feedback term:
-%   such a bug survives a single-direction test but breaks the mirror.
 p = params_vehicle();  trk = track_autox();  f = 0;
 mir = trk;
 mir.x = trk.x;  mir.y = -trk.y;  mir.psi = -trk.psi;  mir.kappa = -trk.kappa;
@@ -133,9 +98,7 @@ for c = {'pp','stanley'}
 end
 end
 
-% =========================================================================
 function ey = local_offset_run(trk, p, ctrl, y0)
-%LOCAL_OFFSET_RUN  Straight-line step response of the lateral loop.
 dt = 1e-3;  nSub = 10;  st = [0; y0; 0; 10; 0; 0];  iPrev = 1;  ey = [];
 for it = 1:400
     if strcmp(ctrl,'pp')
@@ -149,6 +112,6 @@ for it = 1:400
         k3 = vehicle_ode(st+dt/2*k2, dc, 10, p);   k4 = vehicle_ode(st+dt*k3, dc, 10, p);
         st = st + dt/6*(k1+2*k2+2*k3+k4);
     end
-    ey(end+1,1) = st(2); %#ok<AGROW>
+    ey(end+1,1) = st(2);
 end
 end

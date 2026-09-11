@@ -1,14 +1,4 @@
 function out = sim_and_plot(ctrl)
-%SIM_AND_PLOT  Run the Simulink model once with the tuned gains and draw it.
-%
-%   sim_and_plot()    pure pursuit
-%   sim_and_plot(1)   Stanley
-%
-%   A convenience entry point for looking at the model rather than at the
-%   report: it builds autox_lateral.slx for the chosen controller, simulates one
-%   lap, and draws the trajectory over the cone corridor together with the
-%   cross-track error and the steering trace. Everything it plots comes out of
-%   the Simulink run, not out of the MATLAB reference loop.
 
 if nargin < 1, ctrl = 0; end
 here = fileparts(mfilename('fullpath'));
@@ -44,7 +34,6 @@ axis equal; fig_axes();
 xlabel('x  [m]'); ylabel('y  [m]');
 title([name ' - driven line'], 'color', [0.043 0.043 0.043], 'fontsize', 11);
 
-% cross-track error, recomputed from the logged Simulink states
 ey = zeros(size(X,1),1);  i0 = 1;
 for k = 1:size(X,1)
     [i0, ey(k)] = path_nearest(X(k,1), X(k,2), trk.x, trk.y, trk.psi, i0, 3);
@@ -61,7 +50,7 @@ xlabel('time  [s]'); ylabel('steering angle  [deg]');
 title('road-wheel angle', 'color', [0.043 0.043 0.043], 'fontsize', 10);
 
 if usejava('desktop')
-    set(f, 'visible', 'on');   % a headless -batch run would block on this
+    set(f, 'visible', 'on');
 end
 fprintf('%s: %d logged samples, max |e_y| = %.3f m\n', name, size(X,1), max(abs(ey)));
 end

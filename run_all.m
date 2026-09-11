@@ -1,15 +1,6 @@
 function R = run_all(varargin)
-%RUN_ALL  Full comparison: tune, run, sweep, plot, tabulate.
-%
-%   R = RUN_ALL()              uses results_tuning.mat if it exists
-%   R = RUN_ALL('retune',true) re-runs the gain sweep (a few minutes)
-%   R = RUN_ALL('quick',true)  coarser integration, for a fast sanity pass
-%
-%   Runs in MATLAB and in GNU Octave. Everything downstream of this script -
-%   the KPI table, the figures and the numbers quoted in report/REPORT.md - is
-%   produced here, so the report cannot drift from the code.
 
-opt = struct('retune', false, 'quick', false, 'outdir', 'figures');
+opt = struct('retune', false, 'quick', false, 'outdir', 'figures', 'verbose', false);
 for i = 1:2:numel(varargin), opt.(varargin{i}) = varargin{i+1}; end
 
 here = fileparts(mfilename('fullpath'));
@@ -24,7 +15,6 @@ fprintf('\n=== track ===\n');
 fprintf('lap %.1f m | min radius %.2f m | longest straight %.1f m | width %.2f m | closure %.1e m\n', ...
     trk.stats.lapLen, trk.stats.minRadius, trk.stats.maxStraight, trk.width, trk.stats.closureError);
 
-% ---- gains --------------------------------------------------------------
 tuneFile = fullfile(here, 'results_tuning.mat');
 if opt.retune || ~exist(tuneFile, 'file')
     fprintf('\n=== tuning (grid search, same objective for both) ===\n');
@@ -38,25 +28,28 @@ fprintf('pure pursuit : Ld0 = %.1f m, kv = %.2f s   (J = %.3f s)\n', T.pp.best.L
 fprintf('stanley      : ke = %.1f 1/s, kSoft = %.2f m/s (J = %.3f s)\n', T.st.best.ke, T.st.best.kSoft, T.st.best.J);
 
 Rt = tuning_robustness(T);
-fprintf('\ngain-space usability (fraction of the swept grid within x%% of that law''s best)\n');
-fprintf('  pure pursuit : %5.1f %% within 1 %%, %5.1f %% within 5 %%  (%d pairs, worst %.1f s)\n', ...
-    100*Rt.pp.frac(1), 100*Rt.pp.frac(2), Rt.pp.n, Rt.pp.worst);
-fprintf('  stanley      : %5.1f %% within 1 %%, %5.1f %% within 5 %%  (%d pairs, worst %.1f s)\n', ...
-    100*Rt.st.frac(1), 100*Rt.st.frac(2), Rt.st.n, Rt.st.worst);
+if opt.verbose
+    fprintf('\ngain-space usability (fraction of the swept grid within x%% of that law''s best)\n');
+    fprintf('  pure pursuit : %5.1f %% within 1 %%, %5.1f %% within 5 %%  (%d pairs, worst %.1f s)\n', ...
+        100*Rt.pp.frac(1), 100*Rt.pp.frac(2), Rt.pp.n, Rt.pp.worst);
+    fprintf('  stanley      : %5.1f %% within 1 %%, %5.1f %% within 5 %%  (%d pairs, worst %.1f s)\n', ...
+        100*Rt.st.frac(1), 100*Rt.st.frac(2), Rt.st.n, Rt.st.worst);
+end
 
 pPP = p;  pPP.Ld0 = T.pp.best.Ld0;  pPP.kv = T.pp.best.kv;
 pST = p;  pST.ke  = T.st.best.ke;   pST.kSoft = T.st.best.kSoft;
 pars = {pPP, pST};  ctrls = {'pp','stanley'};  names = {'Pure Pursuit','Stanley'};
 
-% ---- nominal lap --------------------------------------------------------
 fprintf('\n=== nominal lap ===\n');
 for i = 1:2
     [lg, k] = run_reference(trk, pars{i}, ctrls{i}, struct('dtPlant', dt, 'tMax', 60));
     res(i) = struct('name', names{i}, 'log', lg, 'kpi', k);
 end
 E = kpi_exectime(trk, p);
-fprintf('control-step cost: PP %.2f us/call, Stanley %.2f us/call  (%.3f %% / %.3f %% of a 10 ms period)\n', ...
-    E.ppUs, E.stUs, E.ppDuty, E.stDuty);
+if opt.verbose
+    fprintf('control-step cost: PP %.2f us/call, Stanley %.2f us/call  (%.3f %% / %.3f %% of a 10 ms period)\n', ...
+        E.ppUs, E.stUs, E.ppDuty, E.stDuty);
+end
 
 tMin = min([res(1).kpi.tEff, res(2).kpi.tEff]);
 for i = 1:2
@@ -64,8 +57,7 @@ for i = 1:2
 end
 local_table(res, trk);
 
-% ---- robustness sweeps --------------------------------------------------
-fprintf('\n=== robustness sweeps ===\n');
+if opt.verbose, fprintf('\n=== robustness sweeps ===\n'); end
 S.speed.x   = [0.90 1.00 1.10 1.20 1.30];
 S.latency.x = [0 0.02 0.05 0.10];
 S.noise.x   = [0 0.02 0.05 0.10];
@@ -79,46 +71,47 @@ for j = 1:numel(S.speed.x)
         o = struct('dtPlant', dt, 'tMax', 60, 'speedScale', S.speed.x(j));
         S.speed.(local_key(i))(j) = local_teff(trk, pars{i}, ctrls{i}, o);
     end
-    fprintf('  speed x%.2f : PP %6.2f s   ST %6.2f s\n', S.speed.x(j), S.speed.pp(j), S.speed.st(j));
+    if opt.verbose
+        fprintf('  speed x%.2f : PP %6.2f s   ST %6.2f s\n', S.speed.x(j), S.speed.pp(j), S.speed.st(j));
+    end
 end
 for j = 1:numel(S.latency.x)
     for i = 1:2
         o = struct('dtPlant', dt, 'tMax', 60, 'latency', S.latency.x(j));
         S.latency.(local_key(i))(j) = local_teff(trk, pars{i}, ctrls{i}, o);
     end
-    fprintf('  latency %3.0f ms : PP %6.2f s   ST %6.2f s\n', S.latency.x(j)*1e3, S.latency.pp(j), S.latency.st(j));
+    if opt.verbose
+        fprintf('  latency %3.0f ms : PP %6.2f s   ST %6.2f s\n', S.latency.x(j)*1e3, S.latency.pp(j), S.latency.st(j));
+    end
 end
 for j = 1:numel(S.noise.x)
     for i = 1:2
         o = struct('dtPlant', dt, 'tMax', 60, 'posNoise', S.noise.x(j), 'seed', 7);
         S.noise.(local_key(i))(j) = local_teff(trk, pars{i}, ctrls{i}, o);
     end
-    fprintf('  noise %4.0f cm : PP %6.2f s   ST %6.2f s\n', S.noise.x(j)*100, S.noise.pp(j), S.noise.st(j));
+    if opt.verbose
+        fprintf('  noise %4.0f cm : PP %6.2f s   ST %6.2f s\n', S.noise.x(j)*100, S.noise.pp(j), S.noise.st(j));
+    end
 end
 
-% ---- where pure pursuit's lap-time advantage comes from ----------------
-fprintf('\n=== lookahead sweep: corner cut vs. lap time ===\n');
-% Both controllers' tuned gains, because the sweep varies pure pursuit's
-% lookahead but ends with Stanley at its own optimum as the reference row.
+if opt.verbose, fprintf('\n=== lookahead sweep: corner cut vs. lap time ===\n'); end
 pBoth = pPP;  pBoth.ke = T.st.best.ke;  pBoth.kSoft = T.st.best.kSoft;
-Lk = sweep_lookahead(trk, pBoth);
+Lk = sweep_lookahead(trk, pBoth, 'verbose', opt.verbose);
 
-% ---- track width: the rules allow 3 m, this study used 3.5 m -----------
-fprintf('\n=== track width sweep (D 8.1.1 allows 3 m) ===\n');
-Wd = sweep_width(p, T, 'dtPlant', dt);
+if opt.verbose, fprintf('\n=== track width sweep (D 8.1.1 allows 3 m) ===\n'); end
+Wd = sweep_width(p, T, 'dtPlant', dt, 'verbose', opt.verbose);
 
-% ---- gain vs. loop delay: law or tuning? -------------------------------
-fprintf('\n=== gain vs. latency maps ===\n');
+if opt.verbose, fprintf('\n=== gain vs. latency maps ===\n'); end
 G = sweep_gain_latency(trk, p, 'verbose', false);
 
-% ---- figures and results ------------------------------------------------
-fprintf('\n=== figures ===\n');
+if opt.verbose, fprintf('\n=== figures ===\n'); end
+plot_summary(trk, p, res, opt.outdir);
 plot_results(trk, p, res, opt.outdir);
 plot_tuning(T, opt.outdir);
 plot_robustness(S, opt.outdir);
 plot_width(Wd, opt.outdir);
 plot_gain_latency(G, T, opt.outdir);
-fprintf('written to %s/\n', opt.outdir);
+fprintf('\nfigures written to %s/  (summary: fig11_summary.png)\n', opt.outdir);
 
 R = struct('trk', trk, 'p', p, 'tuning', T, 'tuneRobust', Rt, 'res', res, ...
            'sweeps', S, 'width', Wd, 'gainLatency', G, 'exec', E, ...
@@ -127,18 +120,15 @@ save('-mat', fullfile(here,'results.mat'), 'R');
 local_markdown(res, trk, T, Rt, S, Wd, E, fullfile(here,'report','kpi_tables.md'));
 end
 
-% =========================================================================
 function k = local_key(i)
 if i == 1, k = 'pp'; else, k = 'st'; end
 end
 
-% =========================================================================
 function te = local_teff(trk, q, ctrl, o)
 [lg, k] = run_reference(trk, q, ctrl, o);
 if lg.completed, te = k.tEff; else, te = NaN; end
 end
 
-% =========================================================================
 function local_table(res, trk)
 fprintf('\n%-24s %10s %10s\n', 'KPI', res(1).name, res(2).name);
 fprintf('%s\n', repmat('-', 1, 46));
@@ -146,9 +136,7 @@ rows = { 'lap time            [s]', 'lapTime', '%10.3f'
          'max cross-track     [m]', 'eyMax',   '%10.3f'
          'RMS cross-track     [m]', 'eyRms',   '%10.4f'
          'RMS steering rate [d/s]', 'dRateRms','%10.2f'
-         'peak steering     [deg]', 'dMaxUsed','%10.2f'
          'cones down/out      [-]', 'doo',     '%10d'
-         'off course          [-]', 'oc',      '%10d'
          'effective time      [s]', 'tEff',    '%10.3f'
          'FSG DV points       [-]', 'points',  '%10.2f' };
 for r = 1:size(rows,1)
@@ -161,10 +149,7 @@ fprintf('\n(effective time = lap + 2 s per cone + 10 s per off-course, FS Rules 
 fprintf(' points per D 9.3.2 with tMax = lap at 6 m/s = %.2f s)\n', trk.lapLen/6);
 end
 
-% =========================================================================
 function local_markdown(res, trk, T, Rt, S, Wd, E, fname)
-%LOCAL_MARKDOWN  Emit the KPI tables the report includes, so the prose and the
-%   numbers cannot disagree.
 d = fileparts(fname);
 if ~exist(d,'dir'), mkdir(d); end
 fid = fopen(fname, 'w');

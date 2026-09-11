@@ -1,15 +1,8 @@
 function plot_tuning(T, outdir)
-%PLOT_TUNING  Gain-sweep cost maps for both controllers.
-%
-%   One sequential ramp, light to dark, on a single hue: light means a low
-%   effective competition time (good), dark means a costly gain pair. The
-%   optimum of each map is marked and labelled directly, so the reader does not
-%   have to read a value off the colour bar to find it. A rainbow map is never
-%   used here - it invents ordering that the data does not have.
 
 if nargin < 2, outdir = 'figures'; end
 if exist('OCTAVE_VERSION', 'builtin')
-    graphics_toolkit('gnuplot');   % Octave: render headless via gnuplot
+    graphics_toolkit('gnuplot');
 end
 cm = local_blue_ramp(64);
 
@@ -24,8 +17,6 @@ maps = { struct('J',T.pp.J, 'xv',T.pp.kv,    'yv',T.pp.Ld0, ...
 
 for m = 1:numel(maps)
     q = maps{m};
-    % a DNF scores 1e3, which would flatten the colour scale; clip the display
-    % range to the finite results and say so on the colour bar
     Jd  = q.J;
     fin = Jd(Jd < 100);
     hi  = max(fin(:));
@@ -42,17 +33,14 @@ for m = 1:numel(maps)
     text(q.bx, q.by, sprintf('  best  %.2f s', q.bJ), 'color', [0.043 0.043 0.043], ...
          'fontsize', 10, 'verticalalignment','bottom');
     set(gca,'xtick',q.xv,'ytick',q.yv,'xcolor',[0.322 0.318 0.306],'ycolor',[0.322 0.318 0.306]);
-    set(gca,'position',[0.11 0.13 0.70 0.76]);   % room for the title and the bar
+    set(gca,'position',[0.11 0.13 0.70 0.76]);
     xlabel(q.xl); ylabel(q.yl);
     title(q.ti, 'color', [0.043 0.043 0.043], 'fontsize', 11);
     print(f, fullfile(outdir, q.fn), '-dpng', '-r140'); close(f);
 end
 end
 
-% =========================================================================
 function cm = local_blue_ramp(n)
-%LOCAL_BLUE_RAMP  Single-hue sequential ramp, light (low) to dark (high),
-%   interpolated from the documented blue scale steps 100 -> 700.
 steps = [205 226 251; 183 211 246; 158 197 244; 134 182 239; 109 167 236;
           85 152 231;  57 135 229;  42 120 214;  37 106 191;  28  92 171;
           24  79 149;  16  66 129;  13  54 107] / 255;

@@ -1,16 +1,4 @@
 function G = sweep_gain_latency(trk, p, varargin)
-%SWEEP_GAIN_LATENCY  Effective time as a function of one gain and loop delay.
-%
-%   G = SWEEP_GAIN_LATENCY(trk, p)
-%
-%   The nominal sweeps show Stanley losing control somewhere between 20 ms and
-%   50 ms of pose latency at its tuned gain, while pure pursuit is nearly
-%   unaffected at 100 ms. That raises the question the comparison actually turns
-%   on: is Stanley delay-intolerant, or is its *tuned gain* delay-intolerant?
-%
-%   This maps the primary gain of each law (Stanley's cross-track gain ke, pure
-%   pursuit's base lookahead Ld0) against latency, so the stability boundary can
-%   be read off directly rather than inferred from two points.
 
 opt = struct('dtPlant', 2e-3, 'verbose', true);
 for i = 1:2:numel(varargin), opt.(varargin{i}) = varargin{i+1}; end
@@ -43,7 +31,6 @@ for a = 1:numel(G.pp.Ld0)
 end
 end
 
-% =========================================================================
 function te = local_run(trk, q, ctrl, lat, opt)
 [lg, k] = run_reference(trk, q, ctrl, ...
     struct('dtPlant', opt.dtPlant, 'tMax', 60, 'latency', lat));

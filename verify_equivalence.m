@@ -1,17 +1,4 @@
 function ok = verify_equivalence(varargin)
-%VERIFY_EQUIVALENCE  Does the Simulink model agree with the reference loop?
-%
-%   ok = VERIFY_EQUIVALENCE()
-%
-%   run_reference.m integrates the plant with RK4 in plain MATLAB code;
-%   autox_lateral.slx integrates the same vehicle_ode.m with ode4 at the same
-%   fixed step, driven by the same controller files. The two are therefore
-%   expected to agree to solver precision, and this script measures by how much
-%   instead of asserting that they must.
-%
-%   Reported per controller: the largest deviation in position, heading, speed
-%   and steering angle over the reference lap. Anything above TOL_* is a real
-%   disagreement between the model and the reference, not numerical noise.
 
 opt = struct('dtPlant', 1e-3, 'dtCtrl', 0.01, 'tol_pos', 1e-3, ...
              'tol_ang', 1e-4, 'tol_v', 1e-3);
@@ -38,10 +25,9 @@ for c = 1:2
     stl = local_get(out, 'st_log');
 
     t  = stl.time;
-    X  = squeeze(stl.signals.values);          % 6 x N or N x 6
+    X  = squeeze(stl.signals.values);
     if size(X,1) == 6, X = X.'; end
 
-    % interpolate the model onto the reference time grid and difference
     n  = min(numel(ref.t), sum(t <= ref.t(end)));
     tg = ref.t(1:n);
     dx = interp1(t, X(:,1), tg) - ref.x(1:n);
@@ -69,7 +55,6 @@ end
 fprintf('\n%s\n', local_verdict(ok));
 end
 
-% =========================================================================
 function v = local_get(out, name)
 if isa(out, 'Simulink.SimulationOutput')
     v = out.get(name);
@@ -78,7 +63,6 @@ else
 end
 end
 
-% =========================================================================
 function s = local_verdict(tf)
 if tf, s = 'PASS'; else, s = 'FAIL'; end
 end
