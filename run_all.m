@@ -88,6 +88,7 @@ G = sweep_gain_latency(trk, p, 'verbose', false);
 
 if opt.verbose, fprintf('\n=== figures ===\n'); end
 plot_summary(trk, p, res, opt.outdir);
+plot_report_figure(trk, res, opt.outdir);
 plot_results(trk, p, res, opt.outdir);
 plot_tuning(T, opt.outdir);
 plot_robustness(S, opt.outdir);

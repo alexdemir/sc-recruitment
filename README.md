@@ -42,10 +42,11 @@ run unmodified in GNU Octave 6.4 and produce bit-identical numbers.
 
 ### Step by step
 
-Open MATLAB, then in the Command Window:
+Open MATLAB, then in the Command Window change to the folder you cloned this
+into and put the code on the path. If you cloned with the default name:
 
 ```matlab
-cd /path/to/this/repository
+cd ~/sc-recruitment
 addpath('src','tests')
 ```
 
