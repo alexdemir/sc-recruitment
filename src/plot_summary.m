@@ -54,8 +54,7 @@ fig_axes();
 set(gca, 'xtick', [1 2], 'xticklabel', {'max |e_y|', 'RMS e_y'});
 ylim([0 1.18*max(vals(:))]);
 ylabel('cross-track error  [m]');
-title(sprintf('lap %.2f s / %.2f s    points %.1f / %.1f', ...
-      res(1).kpi.lapTime, res(2).kpi.lapTime, res(1).kpi.points, res(2).kpi.points), ...
+title(sprintf('lap  %.2f s  /  %.2f s', res(1).kpi.lapTime, res(2).kpi.lapTime), ...
       'color', ink, 'fontsize', 10);
 
 print(f, fullfile(outdir, 'fig11_summary.png'), '-dpng', '-r130');

@@ -1,5 +1,4 @@
 function k = kpi_compute(log, trk, p)
-
 t  = log.t;
 ey = log.ey;
 
@@ -7,9 +6,8 @@ k.lapTime = t(end) - t(1);
 k.eyMax   = max(abs(ey));
 k.eyRms   = sqrt(mean(ey.^2));
 
-dDelta      = diff(log.delta) ./ diff(t);
-k.dRateRms  = rad2deg(sqrt(mean(dDelta.^2)));
-k.dMaxUsed  = rad2deg(max(abs(log.delta)));
+dDelta     = diff(log.delta) ./ diff(t);
+k.dRateRms = rad2deg(sqrt(mean(dDelta.^2)));
 
 cones = [trk.coneL; trk.coneR; trk.coneStart];
 xc    = log.x + p.bodyCtrOff*cos(log.psi);
@@ -27,11 +25,10 @@ for i = 1:size(cones,1)
     yb = -sn.*dx + cs.*dy;
     hit(i) = any(abs(xb) <= halfL & abs(yb) <= halfW);
 end
-k.doo      = sum(hit);
-k.coneHits = cones(hit,:);
+k.doo = sum(hit);
 
 outside = abs(ey) > trk.width/2 + p.bodyWid/2;
 k.oc    = sum(diff([false; outside(:)]) == 1);
 
-k.tEff = k.lapTime + 2*k.doo + 10*k.oc;
+k.score = k.lapTime + 2*k.doo + 10*k.oc;
 end

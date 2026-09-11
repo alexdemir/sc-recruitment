@@ -6,7 +6,7 @@ for i = 1:2:numel(varargin), opt.(varargin{i}) = varargin{i+1}; end
 K.centreline = trk.lapLen;
 K.Ld0 = opt.Ld0;
 n = numel(K.Ld0);
-for f = {'path','cut','lap','eyMax','doo','tEff'}, K.(f{1}) = nan(n,1); end
+for f = {'path','cut','lap','eyMax','doo','score'}, K.(f{1}) = nan(n,1); end
 
 for a = 1:n
     q = p;  q.Ld0 = K.Ld0(a);
@@ -16,10 +16,10 @@ for a = 1:n
     K.lap(a)   = k.lapTime;
     K.eyMax(a) = k.eyMax;
     K.doo(a)   = k.doo;
-    K.tEff(a)  = k.tEff;
+    K.score(a)  = k.score;
     if opt.verbose
-        fprintf('  Ld0 = %.1f m : path %.2f m (%+.2f), lap %.3f s, max|ey| %.3f m, %d cones, tEff %.2f s\n', ...
-            K.Ld0(a), K.path(a), K.cut(a), K.lap(a), K.eyMax(a), K.doo(a), K.tEff(a));
+        fprintf('  Ld0 = %.1f m : path %.2f m (%+.2f), lap %.3f s, max|ey| %.3f m, %d cones, score %.2f s\n', ...
+            K.Ld0(a), K.path(a), K.cut(a), K.lap(a), K.eyMax(a), K.doo(a), K.score(a));
         flush_out();
     end
 end
@@ -30,9 +30,9 @@ K.st.cut   = K.st.path - trk.lapLen;
 K.st.lap   = k.lapTime;
 K.st.eyMax = k.eyMax;
 K.st.doo   = k.doo;
-K.st.tEff  = k.tEff;
+K.st.score  = k.score;
 if opt.verbose
-    fprintf('  Stanley     : path %.2f m (%+.2f), lap %.3f s, max|ey| %.3f m, %d cones, tEff %.2f s\n', ...
-        K.st.path, K.st.cut, K.st.lap, K.st.eyMax, K.st.doo, K.st.tEff);
+    fprintf('  Stanley     : path %.2f m (%+.2f), lap %.3f s, max|ey| %.3f m, %d cones, score %.2f s\n', ...
+        K.st.path, K.st.cut, K.st.lap, K.st.eyMax, K.st.doo, K.st.score);
 end
 end

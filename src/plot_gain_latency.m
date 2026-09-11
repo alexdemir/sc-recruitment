@@ -7,12 +7,12 @@ end
 cm  = local_blue_ramp(64);
 ink = [0.043 0.043 0.043];
 
-panels = { struct('Z',G.st.tEff, 'yv',G.st.ke,  'ti','Stanley: cross-track gain vs. loop delay', ...
+panels = { struct('Z',G.st.score, 'yv',G.st.ke,  'ti','Stanley: cross-track gain vs. loop delay', ...
                   'yl','cross-track gain  k_e  [1/s]', 'by',T.st.best.ke), ...
-           struct('Z',G.pp.tEff, 'yv',G.pp.Ld0, 'ti','Pure Pursuit: base lookahead vs. loop delay', ...
+           struct('Z',G.pp.score, 'yv',G.pp.Ld0, 'ti','Pure Pursuit: base lookahead vs. loop delay', ...
                   'yl','base lookahead  L_{d0}  [m]',  'by',T.pp.best.Ld0) };
 
-allZ = [G.st.tEff(:); G.pp.tEff(:)];
+allZ = [G.st.score(:); G.pp.score(:)];
 allZ = allZ(isfinite(allZ));
 CL   = log10([min(allZ) max(allZ)]);
 
@@ -32,7 +32,7 @@ for i = 1:2
         set(cb, 'ytick', log10(tk), ...
                 'yticklabel', arrayfun(@(v) sprintf('%d', v), tk, 'UniformOutput', false), ...
                 'color', [0.043 0.043 0.043]);
-        ylabel(cb, 'effective time  [s]   (log scale, DNF at max)', 'color', [0.043 0.043 0.043]);
+        ylabel(cb, 'lap time with cone penalties  [s]   (log scale, DNF at max)', 'color', [0.043 0.043 0.043]);
     end
     hold on;
     plot(0, find(q.yv == q.by), 'o', 'markersize', 12, 'linewidth', 2.5, 'color', ink);

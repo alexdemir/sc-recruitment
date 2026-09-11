@@ -60,7 +60,7 @@ for c = 1:numel(conds)
     if ~lg.completed
         J = J + dnf;
     else
-        J = J + k.tEff;
+        J = J + k.score;
     end
 end
 J = J / numel(conds);

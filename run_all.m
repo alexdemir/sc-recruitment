@@ -27,14 +27,6 @@ end
 fprintf('pure pursuit : Ld0 = %.1f m, kv = %.2f s   (J = %.3f s)\n', T.pp.best.Ld0, T.pp.best.kv, T.pp.best.J);
 fprintf('stanley      : ke = %.1f 1/s, kSoft = %.2f m/s (J = %.3f s)\n', T.st.best.ke, T.st.best.kSoft, T.st.best.J);
 
-Rt = tuning_robustness(T);
-if opt.verbose
-    fprintf('\ngain-space usability (fraction of the swept grid within x%% of that law''s best)\n');
-    fprintf('  pure pursuit : %5.1f %% within 1 %%, %5.1f %% within 5 %%  (%d pairs, worst %.1f s)\n', ...
-        100*Rt.pp.frac(1), 100*Rt.pp.frac(2), Rt.pp.n, Rt.pp.worst);
-    fprintf('  stanley      : %5.1f %% within 1 %%, %5.1f %% within 5 %%  (%d pairs, worst %.1f s)\n', ...
-        100*Rt.st.frac(1), 100*Rt.st.frac(2), Rt.st.n, Rt.st.worst);
-end
 
 pPP = p;  pPP.Ld0 = T.pp.best.Ld0;  pPP.kv = T.pp.best.kv;
 pST = p;  pST.ke  = T.st.best.ke;   pST.kSoft = T.st.best.kSoft;
@@ -44,16 +36,6 @@ fprintf('\n=== nominal lap ===\n');
 for i = 1:2
     [lg, k] = run_reference(trk, pars{i}, ctrls{i}, struct('dtPlant', dt, 'tMax', 60));
     res(i) = struct('name', names{i}, 'log', lg, 'kpi', k);
-end
-E = kpi_exectime(trk, p);
-if opt.verbose
-    fprintf('control-step cost: PP %.2f us/call, Stanley %.2f us/call  (%.3f %% / %.3f %% of a 10 ms period)\n', ...
-        E.ppUs, E.stUs, E.ppDuty, E.stDuty);
-end
-
-tMin = min([res(1).kpi.tEff, res(2).kpi.tEff]);
-for i = 1:2
-    res(i).kpi.points = fsg_points(res(i).kpi.tEff, trk.lapLen, tMin);
 end
 local_table(res, trk);
 
@@ -113,9 +95,8 @@ plot_width(Wd, opt.outdir);
 plot_gain_latency(G, T, opt.outdir);
 fprintf('\nfigures written to %s/  (summary: fig11_summary.png)\n', opt.outdir);
 
-R = struct('trk', trk, 'p', p, 'tuning', T, 'tuneRobust', Rt, 'res', res, ...
-           'sweeps', S, 'width', Wd, 'gainLatency', G, 'exec', E, ...
-           'lookahead', Lk);
+R = struct('trk', trk, 'p', p, 'tuning', T, 'res', res, ...
+           'sweeps', S, 'width', Wd, 'gainLatency', G, 'lookahead', Lk);
 save('-mat', fullfile(here,'results.mat'), 'R');
 end
 
@@ -125,7 +106,7 @@ end
 
 function te = local_teff(trk, q, ctrl, o)
 [lg, k] = run_reference(trk, q, ctrl, o);
-if lg.completed, te = k.tEff; else, te = NaN; end
+if lg.completed, te = k.score; else, te = NaN; end
 end
 
 function local_table(res, trk)
@@ -135,15 +116,12 @@ rows = { 'lap time            [s]', 'lapTime', '%10.3f'
          'max cross-track     [m]', 'eyMax',   '%10.3f'
          'RMS cross-track     [m]', 'eyRms',   '%10.4f'
          'RMS steering rate [d/s]', 'dRateRms','%10.2f'
-         'cones down/out      [-]', 'doo',     '%10d'
-         'effective time      [s]', 'tEff',    '%10.3f'
-         'FSG DV points       [-]', 'points',  '%10.2f' };
+         'cones down or out   [-]', 'doo',     '%10d' };
 for r = 1:size(rows,1)
     fprintf('%-24s', rows{r,1});
     fprintf(rows{r,3}, res(1).kpi.(rows{r,2}));
     fprintf(rows{r,3}, res(2).kpi.(rows{r,2}));
     fprintf('\n');
 end
-fprintf('\n(effective time = lap + 2 s per cone + 10 s per off-course, FS Rules 2026 D 10.1.7;\n');
-fprintf(' points per D 9.3.2 with tMax = lap at 6 m/s = %.2f s)\n', trk.lapLen/6);
+fprintf('\n(%.1f m wide track; the narrower-track runs are in R.width)\n', trk.width);
 end
