@@ -34,11 +34,23 @@ chord. The Simulink model agrees with an independent RK4 reference loop to
 | effective time (D 10.1.7) | **17.960 s** | 18.180 s |
 | FSG DV points (D 9.3.2) | **100.00** | 98.87 |
 
-Pure pursuit laps faster despite tracking seven times worse because both receive
-the same speed reference, so lap time reduces to distance driven: it steers along
-a chord to a point ahead on the line, cutting every corner, and drives 208.54 m
-against Stanley's 210.17 m. Held to Stanley's accuracy it laps in 18.320 s —
-slower. The advantage is corner cutting, not a better law.
+**A large tracking error is not automatically a fault here.** The reference is
+the *centreline* — the midpoint between the cone boundaries — and the centreline
+is not the fast way round a track. A racing line deliberately runs wide into a
+corner and cuts to the apex, so it is shorter and faster than the centreline
+precisely by *deviating* from it. Cross-track error measures fidelity to the
+reference line, not the quality of the line being driven.
+
+That is why pure pursuit laps faster while tracking seven times worse. Both
+controllers receive the same speed reference at the same station, so lap time
+reduces to distance driven: pure pursuit steers along a chord to a point ahead
+on the line, which passes inside every arc, and drives 208.54 m against
+Stanley's 210.17 m on a 212.64 m centreline. Held to Stanley's accuracy it laps
+in 18.320 s — slower. Its advantage is corner cutting, not a better control law.
+
+So in this study KPIs 2 and 3 are read as **margin** metrics rather than quality
+metrics: what they really measure is how much room is left before the car
+reaches the cones. That is exactly the quantity the verdict below turns on.
 
 ## The deciding experiment
 

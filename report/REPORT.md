@@ -242,11 +242,15 @@ that error a smooth, low-frequency shape - hence the low steering activity.
 Stanley holds the centreline to within 0.13 m and pays for it with 2.4 times the
 steering rate.
 
-**Lower tracking error is not a faster lap, and it is worth being explicit about
-why.** Cross-track error measures fidelity to the reference line, and the
-reference line here is the *centreline*, not a racing line. A racing line cuts
-corners deliberately, so following the centreline exactly is not the fast thing
-to do. Measured over a lap:
+**A large cross-track error is not automatically a fault, and lower error is not
+a faster lap.** Both points follow from what the error is measured against. The
+reference here is the *centreline* - the midpoint between the two cone
+boundaries - and the centreline is not the fast way round a track. A racing line
+runs wide into a corner and cuts to the apex; it is shorter and faster than the
+centreline precisely by deviating from it. So cross-track error measures
+fidelity to the reference line, not the quality of the line being driven, and a
+controller that holds the centreline perfectly is holding a line that is known
+not to be optimal. Measured over a lap:
 
 | | centreline | Pure Pursuit | Stanley |
 |---|---|---|---|
