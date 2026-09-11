@@ -54,6 +54,10 @@ for i = 1:2
     [lg, k] = run_reference(trk, pars{i}, ctrls{i}, struct('dtPlant', dt, 'tMax', 60));
     res(i) = struct('name', names{i}, 'log', lg, 'kpi', k);
 end
+E = kpi_exectime(trk, p);
+fprintf('control-step cost: PP %.2f us/call, Stanley %.2f us/call  (%.3f %% / %.3f %% of a 10 ms period)\n', ...
+    E.ppUs, E.stUs, E.ppDuty, E.stDuty);
+
 tMin = min([res(1).kpi.tEff, res(2).kpi.tEff]);
 for i = 1:2
     res(i).kpi.points = fsg_points(res(i).kpi.tEff, trk.lapLen, tMin);
@@ -92,6 +96,13 @@ for j = 1:numel(S.noise.x)
     fprintf('  noise %4.0f cm : PP %6.2f s   ST %6.2f s\n', S.noise.x(j)*100, S.noise.pp(j), S.noise.st(j));
 end
 
+% ---- where pure pursuit's lap-time advantage comes from ----------------
+fprintf('\n=== lookahead sweep: corner cut vs. lap time ===\n');
+% Both controllers' tuned gains, because the sweep varies pure pursuit's
+% lookahead but ends with Stanley at its own optimum as the reference row.
+pBoth = pPP;  pBoth.ke = T.st.best.ke;  pBoth.kSoft = T.st.best.kSoft;
+Lk = sweep_lookahead(trk, pBoth);
+
 % ---- track width: the rules allow 3 m, this study used 3.5 m -----------
 fprintf('\n=== track width sweep (D 8.1.1 allows 3 m) ===\n');
 Wd = sweep_width(p, T, 'dtPlant', dt);
@@ -110,9 +121,10 @@ plot_gain_latency(G, T, opt.outdir);
 fprintf('written to %s/\n', opt.outdir);
 
 R = struct('trk', trk, 'p', p, 'tuning', T, 'tuneRobust', Rt, 'res', res, ...
-           'sweeps', S, 'width', Wd, 'gainLatency', G);
+           'sweeps', S, 'width', Wd, 'gainLatency', G, 'exec', E, ...
+           'lookahead', Lk);
 save('-mat', fullfile(here,'results.mat'), 'R');
-local_markdown(res, trk, T, Rt, S, Wd, fullfile(here,'report','kpi_tables.md'));
+local_markdown(res, trk, T, Rt, S, Wd, E, fullfile(here,'report','kpi_tables.md'));
 end
 
 % =========================================================================
@@ -150,7 +162,7 @@ fprintf(' points per D 9.3.2 with tMax = lap at 6 m/s = %.2f s)\n', trk.lapLen/6
 end
 
 % =========================================================================
-function local_markdown(res, trk, T, Rt, S, Wd, fname)
+function local_markdown(res, trk, T, Rt, S, Wd, E, fname)
 %LOCAL_MARKDOWN  Emit the KPI tables the report includes, so the prose and the
 %   numbers cannot disagree.
 d = fileparts(fname);
@@ -190,6 +202,9 @@ for r = 1:size(f,1)
     fprintf(fid, f{r,3}, res(1).kpi.(f{r,2}));  fprintf(fid, ' | ');
     fprintf(fid, f{r,3}, res(2).kpi.(f{r,2}));  fprintf(fid, ' |\n');
 end
+
+fprintf(fid, '| control-step cost [us] | %.2f | %.2f |\n', E.ppUs, E.stUs);
+fprintf(fid, '| ... as %% of a 10 ms period | %.3f %% | %.3f %% |\n', E.ppDuty, E.stDuty);
 
 fprintf(fid, '\n### Robustness, effective time [s]\n\n');
 fprintf(fid, '| stressor | value | Pure Pursuit | Stanley |\n|---|---|---|---|\n');

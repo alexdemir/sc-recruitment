@@ -233,6 +233,7 @@ a point **for pure pursuit**: rather more of its gain space clears the bar.
 | 3. RMS cross-track error | 0.408 m | **0.055 m** | Stanley by 7.4× |
 | 4. RMS steering rate | **8.73 °/s** | 21.12 °/s | PP by 2.4× |
 | 5. cones Down or Out | 0 | 0 | tie |
+| 6. control-step cost | 1.4-1.8 µs | **0.9-1.0 µs** | Stanley by ~1.5× |
 | effective time (D 10.1.7) | **17.960 s** | 18.180 s | PP |
 | FSG DV points (D 9.3.2) | **100.00** | 98.87 | PP by 1.13 |
 
@@ -241,6 +242,73 @@ building an error that peaks near 0.9 m at each apex, and its lookahead makes
 that error a smooth, low-frequency shape - hence the low steering activity.
 Stanley holds the centreline to within 0.13 m and pays for it with 2.4 times the
 steering rate.
+
+**Lower tracking error is not a faster lap, and it is worth being explicit about
+why.** Cross-track error measures fidelity to the reference line, and the
+reference line here is the *centreline*, not a racing line. A racing line cuts
+corners deliberately, so following the centreline exactly is not the fast thing
+to do. Measured over a lap:
+
+| | centreline | Pure Pursuit | Stanley |
+|---|---|---|---|
+| distance driven | 212.64 m | 208.54 m | 210.17 m |
+| versus centreline | - | −4.10 m | −2.47 m |
+| mean speed | - | 11.611 m/s | 11.561 m/s |
+
+Pure pursuit drives 1.63 m less than Stanley, which at 11.6 m/s is 0.14 s of the
+0.22 s gap; the rest is its marginally higher mean speed. Its error is not
+costing it time, it *is* the corner-cutting that saves it time.
+
+The mechanism is geometric and it is worth showing rather than asserting. Pure
+pursuit steers along a **chord** to a point ahead on the centreline, and a chord
+always passes inside the arc, so its path sits inside the centreline through
+every corner - further inside the longer the lookahead. Sweeping `Ld0` with
+everything else fixed makes the whole chain visible
+(`src/sweep_lookahead.m`):
+
+| `Ld0` | distance driven | vs centreline | lap time | max \|e_y\| | cones | effective time |
+|---|---|---|---|---|---|---|
+| 1.0 m | 212.08 m | −0.56 m | 18.320 s | 0.139 m | 0 | 18.32 s |
+| 2.0 m | 211.75 m | −0.89 m | 18.280 s | 0.254 m | 0 | 18.28 s |
+| 3.0 m | 210.95 m | −1.69 m | 18.200 s | 0.392 m | 0 | 18.20 s |
+| 4.0 m | 209.85 m | −2.79 m | 18.090 s | 0.591 m | 0 | 18.09 s |
+| 5.0 m **(tuned)** | 208.54 m | −4.10 m | **17.960 s** | 0.902 m | 0 | 17.96 s |
+| 6.0 m | 207.25 m | −5.39 m | 17.830 s | 1.256 m | **2** | **21.83 s** |
+| **Stanley** | 210.17 m | −2.47 m | 18.180 s | **0.129 m** | 0 | 18.18 s |
+
+More lookahead, more corner cut, shorter path, faster lap, larger error -
+monotonically - until at `Ld0` = 6 m the error has spent the clearance to the
+cone line, two cones fall, and 4 s of penalty erases everything the cutting
+bought.
+
+The row to read twice is the first one against the last. **Held to Stanley's
+tracking accuracy, pure pursuit is the slower of the two**: at `Ld0` = 1 m its
+peak error is 0.139 m against Stanley's 0.129 m, and its lap is 18.320 s against
+Stanley's 18.180 s. So the nominal lap-time advantage is not the law being
+better - it is the law cutting more corner. Stanley is in fact the more
+*efficient* line at equal accuracy: it cuts 2.47 m with a 0.129 m peak error,
+where pure pursuit needs a 1.256 m peak error to cut 5.39 m, because Stanley's
+deviation is one-directional corner lag while pure pursuit's oscillates to both
+sides of the line.
+
+The consequence for this report is that **KPIs 2 and 3 are margin metrics here,
+not speed metrics** - which is exactly why the verdict in §6.4 turns on clearance
+to the cone line rather than on lap time. And it bounds the claim being made:
+with the centreline as the reference, lap time mostly measures how far inside it
+a controller is willing to run. Against an optimised racing line - where
+deviating from the reference costs time instead of saving it - the ranking on
+lap time would be expected to invert. That experiment is not in this study; see
+§7.
+
+A sixth quantity, cheap to measure and specific to a driverless car: the cost of
+one control step. Pure pursuit costs 1.4-1.8 µs per call against Stanley's
+0.9-1.0 µs, because its goal-point search sits on top of the nearest-point
+search that both perform. This is a wall-clock benchmark, so the absolute
+figures move by tens of percent between runs and only the ratio - about 1.5× -
+is stable. Either way it is on the order of 0.01 % of a 10 ms control period:
+neither law is near a rate limit, and the point of measuring is to be able to
+say so rather than assume it. (Timed on a desktop in interpreted MATLAB; the
+ratio and the order of magnitude transfer, the absolute numbers do not.)
 
 On this track pure pursuit is marginally ahead on the metric the rules score.
 That 1.13-point lead is the whole case for it, and §6.4 is about whether it
@@ -350,13 +418,21 @@ Stated plainly, because they bound what the verdict above can claim:
    SLAM drift, no cone-detection error, no map that has to be built during the
    first lap. In a real DV Autocross run the first lap is driven on perception
    alone.
-3. **One layout.** The features were chosen to separate the two laws, but a
+3. **The reference is the centreline, not a racing line.** This is what makes
+   the lateral comparison clean - both laws chase the same line at the same
+   commanded speed - but it also means lap time largely measures how far inside
+   that line each law runs (§6.2). A minimum-curvature line optimised inside the
+   cone corridor would reverse the incentive: deviating from an already-fast
+   reference costs time, so tracking accuracy would convert into lap time and
+   Stanley would be expected to lead on speed as well. Testing that is the
+   single most valuable extension to this study.
+4. **One layout.** The features were chosen to separate the two laws, but a
    different Autocross track - tighter, or faster - may shift the balance. The
    track generator is parametric, so this is cheap to re-run.
-4. **Gains tuned on this track.** The sweep optimises for this layout and these
+5. **Gains tuned on this track.** The sweep optimises for this layout and these
    three conditions. It says which law is easier to tune, not what the gains
    should be at a different event.
-5. **Longitudinal control is shared and simple.** A PI on a fixed speed
+6. **Longitudinal control is shared and simple.** A PI on a fixed speed
    profile, not a combined-slip optimal controller. This is deliberate - it
    isolates the lateral comparison - but it means neither controller is being
    pushed to the true limit of the car.

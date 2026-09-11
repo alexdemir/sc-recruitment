@@ -39,6 +39,8 @@ Fraction of the swept gain grid whose objective lands within x% of that law's ow
 | off-course events | 0 | 0 |
 | effective time [s] | 17.960 | 18.180 |
 | FSG DV Autocross points | 100.00 | 98.87 |
+| control-step cost [us] | 1.47 | 1.01 |
+| ... as % of a 10 ms period | 0.015 % | 0.010 % |
 
 ### Robustness, effective time [s]
 
